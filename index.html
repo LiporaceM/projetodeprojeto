@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SGC — Sistema de Gestão de Clínica (protótipo)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&display=swap" rel="stylesheet">
+<style>
+/* ===== SGC · identidade "cartão de consulta" =====
+   mesa de recepção (fundo), folha da agenda (conteúdo), marca-texto (seleção) */
+:root{
+  --desk:#E9EEEA; --sheet:#FFFFFF; --ink:#18302C; --ink2:#51665F; --ink3:#83958F;
+  --rule:#D3DCD7; --rule2:#E6ECE8;
+  --euca:#2E6B5E; --euca-l:#E2EEE9;
+  --marker:#F6C945; --marker-l:#FFF2BF; --marker-d:#8A6400;
+  --alert:#B8332A; --alert-l:#FAE8E5;
+  --cobalt:#2F5597; --cobalt-l:#E6ECF6;
+  --display:"Bricolage Grotesque","Inter Display","Inter",system-ui,sans-serif;
+  --text:"Atkinson Hyperlegible","Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--desk);color:var(--ink);font:16px/1.55 var(--text);font-variant-numeric:tabular-nums}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--marker);outline-offset:2px}
+h1{font:700 2.1rem/1.1 var(--display);letter-spacing:-.025em;margin:0 0 .35rem;font-stretch:90%}
+h2{font:700 1.15rem/1.25 var(--display);letter-spacing:-.01em;margin:0}
+h3{font:700 1rem/1.3 var(--display);margin:0 0 .5rem}
+.sub{color:var(--ink2);margin:0 0 1.5rem;max-width:62ch}
+.mono{font-family:var(--display);font-weight:600;letter-spacing:.02em}
+.muted{color:var(--ink2)}
+.small{font-size:.86rem}
+a{color:var(--euca)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- login ---------- */
+.login{min-height:100vh;display:grid;grid-template-columns:1fr minmax(360px,440px);gap:0}
+.login-art{padding:56px 6vw;display:flex;flex-direction:column;justify-content:center;gap:28px}
+.login-art h1{font-size:clamp(2.4rem,4.4vw,3.8rem);max-width:12ch;line-height:1}
+.login-art p{max-width:46ch;color:var(--ink2);margin:0}
+.login-side{background:var(--sheet);border-left:1px solid var(--rule);display:flex;align-items:center;padding:40px 36px}
+.login-card{width:100%}
+.demo{margin-top:24px;border-top:1px solid var(--rule)}
+.demo p{margin:14px 0 6px;font-weight:700;font-size:.9rem}
+.demo button{display:flex;width:100%;justify-content:space-between;gap:8px;padding:8px 2px;border:0;border-bottom:1px dashed var(--rule);background:none;cursor:pointer;text-align:left;font-size:.92rem}
+.demo button:hover{background:var(--marker-l)}
+.brand{display:flex;align-items:center;gap:10px;font:800 1.15rem var(--display);letter-spacing:-.01em}
+.brand .cross{width:28px;height:28px;position:relative;flex:none}
+.brand .cross:before,.brand .cross:after{content:"";position:absolute;background:var(--marker);border-radius:2px}
+.brand .cross:before{left:10px;top:2px;width:8px;height:24px}.brand .cross:after{top:10px;left:2px;height:8px;width:24px}
+
+/* ---------- cartão de consulta (elemento-assinatura) ---------- */
+.apcard{background:#FFFDF6;border:1.5px solid var(--ink);border-radius:6px;padding:18px 20px 16px;position:relative;box-shadow:6px 6px 0 var(--ink);max-width:380px}
+.apcard:before{content:"";position:absolute;left:0;right:0;top:46px;border-top:1.5px solid var(--ink)}
+.apcard .ttl{display:flex;justify-content:space-between;align-items:baseline;font:800 1.05rem var(--display);height:28px}
+.apcard .ttl small{font:400 .78rem var(--text);color:var(--ink2)}
+.apcard .ln{display:grid;grid-template-columns:96px 1fr;align-items:end;gap:10px;padding-top:14px}
+.apcard .ln span{font-size:.8rem;color:var(--ink2)}
+.apcard .ln b{border-bottom:1px dotted var(--ink3);min-height:1.55em;font:600 1rem/1.5 var(--display);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.apcard .ln b.vazio{color:var(--ink3);font-weight:400}
+.apcard .ln b.falta{border-bottom:2px solid var(--alert);color:var(--alert);font-size:.85rem}
+.apcard .pair{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.apcard .pair .ln{grid-template-columns:50px 1fr}
+.apcard .foot{margin-top:14px;font-size:.78rem;color:var(--ink2)}
+.stamp{position:absolute;right:18px;bottom:14px;transform:rotate(-9deg);border:3px solid var(--euca);color:var(--euca);border-radius:6px;padding:3px 12px;font:800 1.15rem var(--display);letter-spacing:.08em;opacity:.92;background:rgba(255,253,246,.7);animation:carimbo .35s cubic-bezier(.2,1.6,.4,1) both}
+.stamp.cancel{border-color:var(--alert);color:var(--alert)}
+@keyframes carimbo{from{transform:rotate(-9deg) scale(1.8);opacity:0}}
+
+/* ---------- shell: abas de fichário ---------- */
+.top{background:var(--ink);color:#DCE7E2;padding:0 28px}
+.top-row{display:flex;align-items:center;gap:18px;height:58px}
+.top .brand{color:#fff}
+.who{margin-left:auto;display:flex;align-items:center;gap:12px;font-size:.9rem}
+.who b{color:#fff;font-weight:700}
+.who .perfil{color:#A9C0B8}
+.btn-sair{background:none;border:1px solid #47625B;color:#DCE7E2;border-radius:6px;padding:5px 12px;cursor:pointer}
+.btn-sair:hover{border-color:#DCE7E2}
+.tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+.tabs a{flex:none;display:block;padding:10px 16px 11px;color:#C4D4CE;text-decoration:none;font-weight:700;font-size:.92rem;border-radius:8px 8px 0 0;position:relative}
+.tabs a:hover{color:#fff;background:#24413C}
+.tabs a.on{background:var(--desk);color:var(--ink)}
+.tabs a.on:after{content:"";position:absolute;left:16px;right:16px;bottom:5px;height:4px;background:var(--marker);border-radius:2px}
+.tabs .grp{width:1px;background:#3A5550;margin:10px 6px}
+main{padding:30px 28px 70px;max-width:1260px;margin:0 auto}
+.seguro{font-size:.8rem;color:#A9C0B8;display:flex;align-items:center;gap:6px}
+.seguro i{width:8px;height:8px;border-radius:50%;background:#6CC59F;display:inline-block}
+
+/* ---------- componentes ---------- */
+.sheet{background:var(--sheet);border:1px solid var(--rule);border-radius:4px;padding:22px 24px}
+.sheet+.sheet{margin-top:18px}
+.grid>.sheet+.sheet{margin-top:0}
+.card{background:var(--sheet);border:1px solid var(--rule);border-radius:4px;padding:20px 22px}
+.card+.card{margin-top:18px}.grid>.card+.card{margin-top:0}
+.card-h{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.grid{display:grid;gap:18px}
+.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 16px;border-radius:6px;border:1.5px solid var(--ink);background:var(--sheet);cursor:pointer;font-weight:700;font-size:.92rem;white-space:nowrap;text-decoration:none;color:var(--ink)}
+.btn:hover{background:var(--desk)}
+.btn.pri{background:var(--ink);color:#fff}
+.btn.pri:hover{background:#0F211E}
+.btn.mark{background:var(--marker);border-color:var(--ink);color:var(--ink);box-shadow:3px 3px 0 var(--ink)}
+.btn.mark:hover{background:#FFD866}
+.btn.mark:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
+.btn.dan{color:var(--alert);border-color:#E3B3AD}
+.btn.dan:hover{background:var(--alert-l)}
+.btn.dan.solid{background:var(--alert);color:#fff;border-color:var(--alert)}
+.btn.sm{padding:5px 11px;font-size:.84rem;border-width:1px}
+.btn.lg{padding:13px 18px;font-size:1.02rem;width:100%}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.link{border:0;background:none;color:var(--euca);padding:0;text-decoration:underline}
+label.f{display:block;font-weight:700;font-size:.9rem;margin-bottom:14px}
+label.f span.req{color:var(--alert)}
+.in,select.in,textarea.in{display:block;width:100%;margin-top:6px;padding:10px 12px;border:1.5px solid #B9C6C0;border-radius:6px;background:#fff;font-weight:400;font-size:1rem}
+.in:focus{outline:3px solid var(--marker-l);border-color:var(--ink)}
+.invalid .in,.in.invalid{border-color:var(--alert);background:#FFF9F8}
+.ferr{display:block;color:var(--alert);font-weight:700;font-size:.82rem;margin-top:5px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.sp{flex:1}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:.84rem;font-weight:700;white-space:nowrap}
+.pill:before{content:"";width:9px;height:9px;border-radius:50%;background:currentColor;flex:none}
+.pill.info{color:var(--cobalt)}.pill.ok{color:var(--euca)}.pill.err{color:var(--alert)}
+.pill.warn{color:var(--marker-d)}.pill.muted{color:var(--ink3)}.pill.pri{color:var(--ink)}
+.pill.flat:before{display:none}
+.msg{border-left:5px solid;padding:11px 14px;font-size:.93rem;margin:12px 0;background:var(--sheet)}
+.msg b{display:block;margin-bottom:2px;font-family:var(--display)}
+.msg.err{border-color:var(--alert);background:var(--alert-l);color:#6E1A14}
+.msg.ok{border-color:var(--euca);background:var(--euca-l);color:#173E35}
+.msg.warn{border-color:var(--marker);background:var(--marker-l);color:#5A4100}
+.msg.info{border-color:var(--cobalt);background:var(--cobalt-l);color:#1C335C}
+table{width:100%;border-collapse:collapse;font-size:.93rem}
+th{text-align:left;font-weight:700;font-size:.85rem;color:var(--ink2);padding:10px 12px;border-bottom:2px solid var(--ink);background:var(--sheet)}
+td{padding:11px 12px;border-bottom:1px solid var(--rule2);vertical-align:middle}
+tbody tr:hover td{background:#FAFCFA}
+tr:last-child td{border-bottom:0}
+.tw{overflow:auto;border:1px solid var(--rule);border-radius:4px;background:var(--sheet)}
+.kpi{padding:16px 0 4px;border-top:3px solid var(--ink)}
+.kpi .v{font:800 2.5rem/1 var(--display);letter-spacing:-.03em}
+.kpi .l{color:var(--ink2);font-size:.9rem;margin-top:6px}
+.empty{padding:28px;text-align:center;color:var(--ink2)}
+
+/* ---------- agendar: ficha + cartão ---------- */
+.ag{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:34px;align-items:start}
+.ficha{background:var(--sheet);border:1px solid var(--rule);border-radius:4px}
+.step{display:grid;grid-template-columns:62px 1fr;border-bottom:1px solid var(--rule)}
+.step:last-child{border-bottom:0}
+.step>.gut{border-right:1px solid var(--rule);display:flex;justify-content:center;padding-top:22px}
+.step>.bd{padding:20px 24px 22px;min-width:0}
+.step>.bd>header{display:flex;align-items:baseline;gap:10px;margin-bottom:12px}
+.num{font:800 1.5rem/1 var(--display);color:var(--ink3)}
+.step.done .num{color:var(--euca)}
+.step.invalid{background:#FFF8F7}
+.step.invalid .num{color:var(--alert)}
+.step.invalid>.gut{border-right:3px solid var(--alert)}
+.res-list{display:flex;flex-direction:column;margin-top:10px;max-height:270px;overflow:auto;border-top:1px solid var(--rule2)}
+.res-list button{display:flex;justify-content:space-between;align-items:center;gap:10px;border:0;border-bottom:1px solid var(--rule2);background:none;padding:10px 4px;cursor:pointer;text-align:left}
+.res-list button:hover{background:var(--marker-l)}
+.sel{display:flex;align-items:center;gap:14px}
+.sel .nome{font:700 1.2rem var(--display)}
+.av{width:38px;height:38px;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;font:700 .85rem var(--display);flex:none}
+.chips{display:flex;gap:0;overflow-x:auto;margin:12px 0 4px;border:1px solid var(--rule);border-radius:4px;scrollbar-width:thin}
+.chip{flex:1 0 58px;border:0;border-right:1px solid var(--rule2);background:#fff;padding:8px 2px 9px;text-align:center;cursor:pointer;line-height:1.15;position:relative}
+.chip:last-child{border-right:0}
+.chip .w{font-size:.74rem;color:var(--ink2)}
+.chip .d{font:700 1.2rem var(--display)}
+.chip .n{font-size:.72rem;margin-top:3px;font-weight:700;color:var(--euca)}
+.chip.zero .n{color:var(--ink3)}
+.chip.none{background:repeating-linear-gradient(135deg,#fff 0 6px,#F1F4F2 6px 7px)}
+.chip.none .d,.chip.none .w{color:var(--ink3)}
+.chip:hover{background:var(--marker-l)}
+.chip.on{background:var(--marker)}
+.chip.on .n,.chip.on .w{color:var(--ink)}
+.planner{margin-top:14px;border-top:1px solid var(--rule)}
+.planner .hr{display:grid;grid-template-columns:56px 1fr;border-bottom:1px solid var(--rule2);min-height:46px}
+.planner .hr>span{font:700 .9rem var(--display);color:var(--ink2);padding-top:12px}
+.planner .hr>div{display:flex;flex-wrap:wrap;gap:6px;padding:7px 0}
+.slot{border:1.5px solid var(--ink);background:#fff;color:var(--ink);border-radius:5px;padding:5px 12px;font:700 .95rem var(--display);cursor:pointer;min-width:70px}
+.slot:hover{background:var(--marker-l)}
+.slot.on{background:var(--marker);box-shadow:2px 2px 0 var(--ink)}
+.slot:disabled{border:1px dashed var(--rule);background:transparent;color:var(--ink3);cursor:not-allowed;text-decoration:line-through;font-weight:400}
+.slot.past:disabled{text-decoration:none}
+.legend{display:flex;gap:16px;font-size:.8rem;color:var(--ink2);margin-top:10px;flex-wrap:wrap}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px;border:1.5px solid var(--ink)}
+.resumo{position:sticky;top:20px}
+.resumo .apcard{max-width:none}
+.perf{font-size:.8rem;color:var(--ink2);margin-top:10px}
+.sim{display:flex;gap:10px;align-items:flex-start;border:1px dashed #C8B26A;border-radius:6px;padding:10px 12px;font-size:.85rem;margin:20px 0 14px;background:#FFFCF0}
+.sim input{margin-top:3px}
+
+/* ---------- semana ---------- */
+.week{display:grid;grid-template-columns:repeat(7,minmax(128px,1fr));overflow-x:auto;border:1px solid var(--rule);border-radius:4px;background:#fff}
+.day{border-right:1px solid var(--rule2);min-height:130px;display:flex;flex-direction:column}
+.day:last-child{border-right:0}
+.day header{padding:9px 10px;border-bottom:2px solid var(--ink);font:700 .9rem var(--display);display:flex;justify-content:space-between}
+.day.today header{background:var(--marker)}
+.day .b{padding:6px;display:flex;flex-direction:column;gap:4px}
+.ev{border-radius:4px;padding:5px 7px;font-size:.8rem;border-left:4px solid var(--cobalt);background:var(--cobalt-l);cursor:pointer;line-height:1.3}
+.ev.confirmada{background:var(--euca-l);border-color:var(--euca)}
+.ev.realizada{background:#F2F4F3;border-color:var(--ink3);color:var(--ink2)}
+.ev.livre{background:none;border-left:4px solid transparent;color:var(--ink3);cursor:default;border-bottom:1px dashed var(--rule2);border-radius:0}
+.ev b{font-family:var(--display);margin-right:5px}
+
+/* ---------- modal e avisos ---------- */
+.ovl{position:fixed;inset:0;background:rgba(24,48,44,.5);display:flex;align-items:flex-start;justify-content:center;padding:6vh 16px;z-index:50;overflow:auto}
+.modal{background:#fff;border-radius:6px;width:100%;max-width:540px;border:1.5px solid var(--ink);box-shadow:8px 8px 0 rgba(24,48,44,.35)}
+.modal.wide{max-width:780px}
+.modal>header{display:flex;justify-content:space-between;align-items:center;padding:16px 22px;border-bottom:1px solid var(--rule)}
+.modal .x{border:0;background:none;font-size:1.6rem;line-height:1;cursor:pointer;color:var(--ink2)}
+.mbody{padding:20px 22px}
+.modal>footer{display:flex;justify-content:flex-end;gap:10px;padding:14px 22px;border-top:1px solid var(--rule);flex-wrap:wrap}
+#toasts{position:fixed;right:18px;bottom:18px;display:flex;flex-direction:column;gap:8px;z-index:80;max-width:390px}
+.toast{background:var(--ink);color:#fff;border-radius:6px;padding:12px 16px;font-size:.92rem;border-left:6px solid var(--marker);animation:tin .2s ease}
+.toast.err{border-left-color:#F2877E}.toast.warn{border-left-color:#F6C945}
+@keyframes tin{from{transform:translateY(8px);opacity:0}}
+.kv{display:grid;grid-template-columns:140px 1fr;gap:7px 14px;font-size:.95rem}
+.kv dt{color:var(--ink2)}.kv dd{margin:0;font-weight:700}
+.tl{border-left:2px solid var(--rule);margin:6px 0 0 6px;padding-left:16px;font-size:.88rem}
+.tl div{margin-bottom:8px;position:relative}
+.tl div:before{content:"";position:absolute;left:-22px;top:7px;width:10px;height:10px;border-radius:50%;background:var(--sheet);border:2px solid var(--ink)}
+.bar{height:10px;background:var(--rule2);border-radius:2px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--ink)}
+.note{font-size:.84rem;color:var(--ink2);border-top:1px solid var(--rule2);margin-top:16px;padding-top:12px}
+.cbx{width:18px;height:18px;accent-color:var(--ink);cursor:pointer}
+.tag-req{font:700 .8rem var(--display);background:var(--marker-l);border:1px solid #E8D27E;padding:1px 7px;border-radius:4px;white-space:nowrap}
+textarea.in{min-height:140px;font:.8rem/1.4 ui-monospace,Menlo,Consolas,monospace}
+@media (max-width:1020px){
+  .ag{grid-template-columns:1fr}.resumo{position:static}
+  .g4{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr}
+}
+@media (max-width:760px){
+  .login{grid-template-columns:1fr}.login-art{padding:32px 22px}.login-side{border-left:0;border-top:1px solid var(--rule);padding:28px 22px}
+  main{padding:20px 14px 50px}.top{padding:0 12px}
+  .g2,.grid[style]{grid-template-columns:1fr !important}
+  .seguro,.who .perfil{display:none}
+  .kv{grid-template-columns:105px 1fr}
+  .step{grid-template-columns:40px 1fr}.step>.bd{padding:16px 14px}
+  h1{font-size:1.7rem}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="modalRoot"></div>
+<div id="toasts" aria-live="polite"></div>
+<script>
+'use strict';
+/* =====================================================================
+   SGC — Sistema de Gestão de Clínica Médica · Protótipo navegável
+   Camadas: Modelo (S) · Serviços/Controle (svc) · Interface (views)
+   ===================================================================== */
+const CLINICA = { nome: 'Clínica SGC', endereco: 'Rua das Acácias, 250 — Centro', telefone: '(11) 3000-0000' };
+const STORE_KEY = 'sgc-prototipo-v1';
+const SESSAO_MIN = 15, MAX_TENT = 5, BLOQ_MIN = 2;
+
+const PERFIS = { admin: 'Administrador', recepcionista: 'Recepcionista', medico: 'Médico', paciente: 'Paciente' };
+const PERMS = [
+  ['dashboard', 'Ver painel da clínica'],
+  ['pacientes.ver', 'Consultar pacientes'],
+  ['pacientes.editar', 'Cadastrar/atualizar pacientes'],
+  ['medicos.ver', 'Consultar médicos e especialidades'],
+  ['medicos.gerir', 'Cadastrar médicos e especialidades'],
+  ['agendas.ver', 'Consultar agendas dos médicos'],
+  ['agendas.gerir', 'Definir disponibilidade (agenda)'],
+  ['consultas.ver', 'Consultar consultas'],
+  ['consultas.agendar', 'Incluir (agendar) consultas'],
+  ['consultas.remarcar', 'Remarcar consultas'],
+  ['consultas.cancelar', 'Cancelar consultas'],
+  ['agenda.propria', 'Ver a própria agenda (médico)'],
+  ['consultas.proprias', 'Ver as próprias consultas (paciente)'],
+  ['usuarios.gerir', 'Gerir usuários e autorizações'],
+  ['backup', 'Backup e restauração'],
+  ['auditoria', 'Ver trilha de auditoria'],
+];
+const PERM_PADRAO = {
+  admin: ['dashboard','pacientes.ver','pacientes.editar','medicos.ver','medicos.gerir','agendas.ver','agendas.gerir','consultas.ver','consultas.agendar','consultas.remarcar','consultas.cancelar','usuarios.gerir','backup','auditoria'],
+  recepcionista: ['dashboard','pacientes.ver','pacientes.editar','medicos.ver','agendas.ver','consultas.ver','consultas.agendar','consultas.remarcar','consultas.cancelar'],
+  medico: ['agenda.propria'],
+  paciente: ['consultas.proprias'],
+};
+const PERM_TRAVADAS = { admin: ['usuarios.gerir'] };
+const STATUS = {
+  agendada: { l: 'Agendada', c: 'info' }, confirmada: { l: 'Confirmada', c: 'ok' },
+  cancelada: { l: 'Cancelada', c: 'err' }, realizada: { l: 'Realizada', c: 'muted' },
+};
+const ativa = c => c.status === 'agendada' || c.status === 'confirmada';
+
+/* ---------------- utilidades ---------------- */
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = v => String(v ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+const clone = o => JSON.parse(JSON.stringify(o));
+const pad = n => String(n).padStart(2, '0');
+const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const parse = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const addDias = (s, n) => { const d = parse(s); d.setDate(d.getDate() + n); return iso(d); };
+const hoje = () => iso(new Date());
+const DS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+const MES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+const fData = s => s ? s.split('-').reverse().join('/') : '';
+const fDataL = s => { const d = parse(s); return `${DS[d.getDay()]}, ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`; };
+const toMin = h => { const [a, b] = h.split(':').map(Number); return a * 60 + b; };
+const hhmm = m => pad(Math.floor(m / 60)) + ':' + pad(m % 60);
+const agoraMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
+const fTs = ts => new Date(ts).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const iniciais = n => n.replace(/^(Dra?\.)\s*/, '').split(' ').filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase();
+const futura = c => c.data > hoje() || (c.data === hoje() && toMin(c.horario) > agoraMin());
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+/* CPF */
+const dvCPF = nums => { let s = 0; const n = nums.length + 1; nums.forEach((d, i) => s += d * (n - i)); const r = (s * 10) % 11; return r === 10 ? 0 : r; };
+const fmtCPF = d => d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+function gerarCPF(rnd) { const n = Array.from({ length: 9 }, () => Math.floor(rnd() * 10)); n.push(dvCPF(n)); n.push(dvCPF(n)); return fmtCPF(n.join('')); }
+function validarCPF(c) { const d = String(c).replace(/\D/g, ''); if (d.length !== 11 || /^(\d)\1+$/.test(d)) return false; const n = d.split('').map(Number); return dvCPF(n.slice(0, 9)) === n[9] && dvCPF(n.slice(0, 10)) === n[10]; }
+const ocultarCPF = c => '***.' + c.slice(4, 11) + '-**';
+function mascara(tipo, v) {
+  let d = v.replace(/\D/g, '');
+  if (tipo === 'cpf') { d = d.slice(0, 11); return d.replace(/^(\d{3})(\d)/, '$1.$2').replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1-$2'); }
+  if (tipo === 'tel') { d = d.slice(0, 11); if (d.length <= 2) return d ? '(' + d : ''; if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`; if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`; return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`; }
+  return v;
+}
+
+/* Hash de senhas (RNF02) — SHA-256 com salt */
+async function hashSenha(senha, salt) {
+  const data = new TextEncoder().encode(salt + ':' + senha);
+  try { const buf = await crypto.subtle.digest('SHA-256', data); return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join(''); }
+  catch (e) { let h = 2166136261; for (const b of data) { h ^= b; h = Math.imul(h, 16777619); } return 'fnv' + (h >>> 0).toString(16); }
+}
+const novoSalt = () => Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6);
+
+/* ---------------- erros de negócio ---------------- */
+class ErroNegocio extends Error { constructor(codigo, msg, campos = []) { super(msg); this.codigo = codigo; this.campos = campos; } }
+
+/* ---------------- estado ---------------- */
+let S = null;            // dados persistidos (modelo)
+let SESSAO = null;       // { userId, ultimo }
+const nextId = k => (S.seq[k] = (S.seq[k] || 0) + 1);
+function salvar() { try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) { } }
+function carregar() { try { const j = localStorage.getItem(STORE_KEY); return j ? JSON.parse(j) : null; } catch (e) { return null; } }
+function salvarSessao() { try { SESSAO ? sessionStorage.setItem(STORE_KEY + '-s', JSON.stringify(SESSAO)) : sessionStorage.removeItem(STORE_KEY + '-s'); } catch (e) { } }
+function carregarSessao() { try { return JSON.parse(sessionStorage.getItem(STORE_KEY + '-s') || 'null'); } catch (e) { return null; } }
+
+const usuarioAtual = () => SESSAO && S.usuarios.find(u => u.id === SESSAO.userId);
+const pode = p => { const u = usuarioAtual(); return !!u && (S.permissoes[u.perfil] || []).includes(p); };
+function exigir(p, acao) { if (!pode(p)) throw new ErroNegocio('RN04', `Operação não permitida: seu perfil não tem autorização para ${acao || p}. (RN04)`); }
+const pac = id => S.pacientes.find(p => p.id === +id);
+const med = id => S.medicos.find(m => m.id === +id);
+const esp = id => S.especialidades.find(e => e.id === +id);
+const cons = id => S.consultas.find(c => c.id === +id);
+
+function auditar(acao, detalhe) {
+  const u = usuarioAtual();
+  S.auditoria.unshift({ ts: Date.now(), usuario: u ? u.login : 'sistema', perfil: u ? u.perfil : '-', acao, detalhe });
+  if (S.auditoria.length > 500) S.auditoria.length = 500;
+}
+
+/* ---------------- dados de demonstração ---------------- */
+async function seed() {
+  const rnd = mulberry32(20261111);
+  S = { versao: 1, criadoEm: Date.now(), seq: {}, especialidades: [], medicos: [], pacientes: [], agendas: [], consultas: [],
+        usuarios: [], notificacoes: [], auditoria: [], backups: [], permissoes: clone(PERM_PADRAO), tentativas: {} };
+  ['Clínica Geral', 'Cardiologia', 'Dermatologia', 'Pediatria', 'Ortopedia', 'Ginecologia']
+    .forEach(nome => S.especialidades.push({ id: nextId('esp'), nome }));
+  const MED = [
+    ['Dra. Ana Souza', 'CRM/SP 123456', 1, 30, [1, 2, 3, 4, 5], [['08:00', '12:00']], 'dr.ana'],
+    ['Dr. Carlos Mendes', 'CRM/SP 234567', 2, 30, [1, 3, 5], [['13:00', '18:00']], 'dr.carlos'],
+    ['Dra. Paula Ferreira', 'CRM/SP 345678', 3, 20, [2, 4], [['09:00', '12:00']], 'dra.paula'],
+    ['Dr. Roberto Nunes', 'CRM/SP 456789', 4, 30, [1, 2, 3, 4], [['14:00', '18:00']], 'dr.roberto'],
+    ['Dra. Luiza Teixeira', 'CRM/SP 567890', 4, 30, [2, 3, 5], [['08:00', '12:00']], 'dra.luiza'],
+    ['Dr. Marcos Vieira', 'CRM/SP 678901', 5, 30, [1, 4], [['08:00', '12:00'], ['14:00', '17:00']], 'dr.marcos'],
+    ['Dr. Felipe Araújo', 'CRM/SP 789012', 1, 30, [1, 2, 3, 4, 5], [['13:00', '17:00']], 'dr.felipe'],
+    ['Dra. Helena Duarte', 'CRM/SP 890123', 6, 40, [3, 5], [['13:00', '17:00']], 'dra.helena'],
+  ];
+  const h0 = hoje();
+  MED.forEach(([nome, crm, especialidadeId, duracao, dias, blocos]) => {
+    const m = { id: nextId('med'), nome, crm, especialidadeId, duracao, ativo: true };
+    S.medicos.push(m);
+    for (let i = -14; i <= 35; i++) {
+      const d = addDias(h0, i); if (!dias.includes(parse(d).getDay())) continue;
+      blocos.forEach(([a, b]) => S.agendas.push({ id: nextId('ag'), medicoId: m.id, data: d, horaInicio: a, horaFim: b }));
+    }
+  });
+  const NOMES = ['Maria Oliveira', 'João Pereira', 'Ana Clara Santos', 'Pedro Henrique Lima', 'Juliana Costa', 'Lucas Almeida', 'Fernanda Rocha',
+    'Rafael Martins', 'Beatriz Carvalho', 'Gabriel Ribeiro', 'Camila Fernandes', 'Thiago Gomes', 'Larissa Moreira', 'Eduardo Barbosa'];
+  NOMES.forEach((nome, i) => {
+    const ano = 1950 + Math.floor(rnd() * 60);
+    S.pacientes.push({ id: nextId('pac'), nome, cpf: gerarCPF(rnd), nascimento: `${ano}-${pad(1 + Math.floor(rnd() * 12))}-${pad(1 + Math.floor(rnd() * 28))}`,
+      telefone: `(11) 9${8000 + Math.floor(rnd() * 1999)}-${1000 + Math.floor(rnd() * 8999)}`,
+      email: norm(nome).replace(/\s+/g, '.') + '@email.com', criadoEm: Date.now() });
+  });
+  // consultas fictícias
+  for (const ag of S.agendas) {
+    const off = Math.round((parse(ag.data) - parse(h0)) / 864e5); if (off < -10 || off > 14) continue;
+    const m = med(ag.medicoId);
+    const p = off < 0 ? .55 : off === 0 ? .5 : off <= 4 ? .45 : off <= 9 ? .3 : .15;
+    for (const hr of slotsDaAgenda(ag, m.duracao)) {
+      if (rnd() > p) continue;
+      const pa = S.pacientes[Math.floor(rnd() * S.pacientes.length)];
+      if (pa.id === 1 && off >= 0) continue; // consultas da Maria são criadas abaixo
+      if (S.consultas.some(c => c.pacienteId === pa.id && c.data === ag.data && c.horario === hr && ativa(c))) continue;
+      const passado = off < 0 || (off === 0 && toMin(hr) <= agoraMin());
+      let status = passado ? (rnd() < .12 ? 'cancelada' : 'realizada') : (rnd() < .05 ? 'cancelada' : rnd() < .35 ? 'confirmada' : 'agendada');
+      criarConsultaBruta(pa.id, m.id, ag.data, hr, status, 'recepcao');
+    }
+  }
+  // garante consultas futuras para a paciente de demonstração (Maria)
+  [[1, 1], [2, 3]].forEach(([medicoId, ini]) => {
+    for (let i = ini; i < 30; i++) {
+      const d = addDias(h0, i); const r = horariosDisponiveis(medicoId, d);
+      if (r.livres.length) { const c = criarConsultaBruta(1, medicoId, d, r.livres[Math.min(1, r.livres.length - 1)].hora, i === 1 ? 'agendada' : 'confirmada', 'recepcao'); notificar(c, 'agendamento'); break; }
+    }
+  });
+  const U = [['admin', 'Administrador da Clínica', 'admin', 'admin123'], ['recepcao', 'Rita Albuquerque', 'recepcionista', 'recep123']];
+  for (const [login, nome, perfil, senha] of U) await criarUsuarioBruto({ login, nome, perfil, senha });
+  for (let i = 0; i < MED.length; i++) await criarUsuarioBruto({ login: MED[i][6], nome: MED[i][0], perfil: 'medico', senha: 'medico123', medicoId: i + 1 });
+  await criarUsuarioBruto({ login: 'maria', nome: 'Maria Oliveira', perfil: 'paciente', senha: 'paciente123', pacienteId: 1 });
+  S.auditoria = [];
+  S.backups = [];
+  S.backups.unshift({ id: nextId('bkp'), ts: Date.now(), autor: 'sistema', tipo: 'Automático (diário)', dados: JSON.stringify(dadosDominio()) });
+  auditar('Sistema iniciado', 'Base de demonstração criada');
+  salvar();
+}
+async function criarUsuarioBruto({ login, nome, perfil, senha, medicoId = null, pacienteId = null }) {
+  const salt = novoSalt();
+  const u = { id: nextId('usr'), login, nome, perfil, salt, senhaHash: await hashSenha(senha, salt), medicoId, pacienteId, ativo: true, ultimoAcesso: null };
+  S.usuarios.push(u); return u;
+}
+function gerarCodigo() { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let c; do { c = 'SGC-' + Array.from({ length: 5 }, () => A[Math.floor(Math.random() * A.length)]).join(''); } while (S.consultas.some(x => x.codigo === c)); return c; }
+function criarConsultaBruta(pacienteId, medicoId, data, horario, status, autor) {
+  const c = { id: nextId('con'), codigo: gerarCodigo(), pacienteId, medicoId, data, horario, status, criadaEm: Date.now(), criadaPor: autor,
+    historico: [{ ts: Date.now(), por: autor, txt: `Consulta agendada para ${fData(data)} às ${horario}` }] };
+  S.consultas.push(c); return c;
+}
+
+/* =====================================================================
+   SERVIÇOS (Controle) — onde as regras de negócio são garantidas
+   ===================================================================== */
+function slotsDaAgenda(ag, dur) { const out = []; for (let t = toMin(ag.horaInicio); t + dur <= toMin(ag.horaFim); t += dur) out.push(hhmm(t)); return out; }
+
+/** RF03 · Agenda.consultarDisponibilidade() */
+function horariosDisponiveis(medicoId, data, ignorarConsultaId = null) {
+  const t0 = performance.now();
+  const m = med(medicoId);
+  const ags = S.agendas.filter(a => a.medicoId === +medicoId && a.data === data);
+  const ocup = new Map(S.consultas.filter(c => c.medicoId === +medicoId && c.data === data && ativa(c) && c.id !== ignorarConsultaId).map(c => [c.horario, c]));
+  const h = hoje(), nm = agoraMin();
+  const slots = [...new Set(ags.flatMap(a => slotsDaAgenda(a, m ? m.duracao : 30)))].sort().map(hora => ({
+    hora, consulta: ocup.get(hora) || null, passado: data < h || (data === h && toMin(hora) <= nm),
+  }));
+  const livres = slots.filter(s => !s.consulta && !s.passado);
+  return { slots, livres, temAgenda: ags.length > 0, ms: performance.now() - t0 };
+}
+
+/** Valida RN01, RN02 e conflitos do paciente para um horário */
+function validarHorario(medicoId, data, horario, pacienteId, ignorarConsultaId = null) {
+  const m = med(medicoId);
+  if (!m || !m.ativo) throw new ErroNegocio('MED', 'O médico selecionado não está ativo no cadastro.', ['medico']);
+  if (data < hoje() || (data === hoje() && toMin(horario) <= agoraMin())) throw new ErroNegocio('PAS', 'Não é possível marcar consultas em data ou horário que já passou.', ['horario']);
+  const r = horariosDisponiveis(medicoId, data, ignorarConsultaId);
+  if (!r.slots.some(s => s.hora === horario))
+    throw new ErroNegocio('RN02', `O horário ${horario} está fora da disponibilidade cadastrada de ${m.nome} em ${fData(data)}. (RN02)`, ['horario']);
+  const conf = S.consultas.find(c => c.medicoId === +medicoId && c.data === data && c.horario === horario && ativa(c) && c.id !== ignorarConsultaId);
+  if (conf) throw new ErroNegocio('RN01', `Conflito de agendamento: ${m.nome} já possui consulta ativa em ${fData(data)} às ${horario}. O horário pode ter sido reservado por outro usuário — selecione um novo horário. (RN01 · FA03)`, ['horario']);
+  const confP = S.consultas.find(c => c.pacienteId === +pacienteId && c.data === data && c.horario === horario && ativa(c) && c.id !== ignorarConsultaId);
+  if (confP) throw new ErroNegocio('PAC', `O paciente já possui outra consulta ativa em ${fData(data)} às ${horario} (${med(confP.medicoId).nome}).`, ['horario']);
+}
+
+/** RF04 · UC01 – Agendar consulta (passos 7, 8 e 9) */
+function agendarConsulta(d, opcoes = {}) {
+  exigir('consultas.agendar', 'incluir consultas');
+  const faltam = [];
+  if (!d.pacienteId) faltam.push('paciente');
+  if (!d.medicoId) faltam.push('medico');
+  if (!d.data) faltam.push('data');
+  if (!d.horario) faltam.push('horario');
+  if (faltam.length) throw new ErroNegocio('FA04', 'Preencha as informações obrigatórias destacadas antes de confirmar: ' + faltam.map(f => ({ paciente: 'paciente', medico: 'médico', data: 'data', horario: 'horário' }[f])).join(', ') + '.', faltam);
+  const p = pac(d.pacienteId);
+  if (!p) throw new ErroNegocio('RN03', 'O paciente precisa estar cadastrado para que a consulta seja confirmada. (RN03)', ['paciente']);
+  if (opcoes.simularConcorrencia) {
+    // FA03 · outro recepcionista reserva o mesmo horário um instante antes da confirmação
+    const outro = S.pacientes.find(x => x.id !== p.id && !S.consultas.some(c => c.pacienteId === x.id && c.data === d.data && c.horario === d.horario && ativa(c)));
+    const livre = !S.consultas.some(c => c.medicoId === +d.medicoId && c.data === d.data && c.horario === d.horario && ativa(c));
+    if (outro && livre) { criarConsultaBruta(outro.id, +d.medicoId, d.data, d.horario, 'agendada', 'recepcao2 (simulação)'); auditar('Consulta agendada', `[simulação FA03] por outro usuário · ${fData(d.data)} ${d.horario}`); }
+  }
+  validarHorario(d.medicoId, d.data, d.horario, d.pacienteId);
+  const u = usuarioAtual();
+  const c = criarConsultaBruta(p.id, +d.medicoId, d.data, d.horario, 'agendada', u.login);
+  auditar('Consulta agendada', `${c.codigo} · ${p.nome} · ${med(c.medicoId).nome} · ${fData(c.data)} ${c.horario}`);
+  notificar(c, 'agendamento');
+  salvar();
+  return c;
+}
+
+/** RF05 · Remarcar */
+function remarcarConsulta(id, data, horario) {
+  exigir('consultas.remarcar', 'remarcar consultas');
+  const c = cons(id);
+  if (!c || !ativa(c)) throw new ErroNegocio('ST', 'Somente consultas ativas podem ser remarcadas.');
+  if (!data || !horario) throw new ErroNegocio('FA04', 'Selecione a nova data e o novo horário.', [!data ? 'data' : 'horario']);
+  if (data === c.data && horario === c.horario) throw new ErroNegocio('IG', 'Escolha uma data ou horário diferente do atual.', ['horario']);
+  validarHorario(c.medicoId, data, horario, c.pacienteId, c.id);
+  const antes = `${fData(c.data)} ${c.horario}`;
+  c.data = data; c.horario = horario; c.status = 'agendada';
+  c.historico.push({ ts: Date.now(), por: usuarioAtual().login, txt: `Remarcada de ${antes} para ${fData(data)} às ${horario}` });
+  auditar('Consulta remarcada', `${c.codigo} · ${antes} → ${fData(data)} ${horario}`);
+  notificar(c, 'remarcacao', antes);
+  salvar(); return c;
+}
+
+/** RF05 · Cancelar */
+function cancelarConsulta(id, motivo) {
+  exigir('consultas.cancelar', 'cancelar consultas');
+  const c = cons(id);
+  if (!c || !ativa(c)) throw new ErroNegocio('ST', 'Somente consultas ativas podem ser canceladas.');
+  if (!motivo || motivo.trim().length < 3) throw new ErroNegocio('FA04', 'Informe o motivo do cancelamento.', ['motivo']);
+  c.status = 'cancelada'; c.motivoCancelamento = motivo.trim();
+  c.historico.push({ ts: Date.now(), por: usuarioAtual().login, txt: `Cancelada — motivo: ${motivo.trim()}` });
+  auditar('Consulta cancelada', `${c.codigo} · ${motivo.trim()}`);
+  notificar(c, 'cancelamento');
+  salvar(); return c;
+}
+
+/** RF07 · Paciente confirma presença (apenas suas consultas) */
+function confirmarPresenca(id) {
+  exigir('consultas.proprias', 'confirmar consultas');
+  const u = usuarioAtual(), c = cons(id);
+  if (!c || c.pacienteId !== u.pacienteId) throw new ErroNegocio('RN04', 'Esta consulta não pertence ao seu cadastro.');
+  if (c.status !== 'agendada') throw new ErroNegocio('ST', 'Esta consulta não está aguardando confirmação.');
+  c.status = 'confirmada';
+  c.historico.push({ ts: Date.now(), por: u.login, txt: 'Presença confirmada pelo paciente' });
+  auditar('Presença confirmada', c.codigo); salvar(); return c;
+}
+function marcarRealizada(id) {
+  exigir('agenda.propria', 'registrar atendimento');
+  const u = usuarioAtual(), c = cons(id);
+  if (!c || c.medicoId !== u.medicoId) throw new ErroNegocio('RN04', 'Esta consulta não pertence à sua agenda.');
+  if (!ativa(c)) throw new ErroNegocio('ST', 'A consulta não está ativa.');
+  if (c.data > hoje()) throw new ErroNegocio('ST', 'Somente consultas de hoje ou anteriores podem ser registradas como realizadas.');
+  c.status = 'realizada'; c.historico.push({ ts: Date.now(), por: u.login, txt: 'Atendimento registrado pelo médico' });
+  auditar('Atendimento registrado', c.codigo); salvar(); return c;
+}
+
+/** Notificação ao paciente (RF07 · UC01 passo 9) — envio simulado */
+function notificar(c, tipo, extra) {
+  const p = pac(c.pacienteId), m = med(c.medicoId), e = esp(m.especialidadeId);
+  const base = `${m.nome} (${e.nome}) · ${fDataL(c.data)} às ${c.horario} · ${CLINICA.nome}, ${CLINICA.endereco}. Código ${c.codigo}.`;
+  const txt = {
+    agendamento: `Olá, ${p.nome.split(' ')[0]}! Sua consulta foi agendada: ${base} Chegue com 15 min de antecedência e traga documento com foto.`,
+    remarcacao: `Olá, ${p.nome.split(' ')[0]}! Sua consulta de ${extra} foi remarcada para: ${base}`,
+    cancelamento: `Olá, ${p.nome.split(' ')[0]}. Sua consulta ${c.codigo} com ${m.nome} em ${fData(c.data)} às ${c.horario} foi cancelada. Para remarcar, ligue ${CLINICA.telefone}.`,
+  }[tipo];
+  S.notificacoes.unshift({ id: nextId('not'), ts: Date.now(), pacienteId: p.id, consultaId: c.id, tipo, canais: [p.email ? 'e-mail' : null, p.telefone ? 'SMS' : null].filter(Boolean), destino: [p.email, p.telefone].filter(Boolean).join(' · '), texto: txt });
+}
+
+/** RF01 · Pacientes */
+function salvarPaciente(dados) {
+  exigir('pacientes.editar', 'cadastrar ou atualizar pacientes');
+  const er = {};
+  const nome = (dados.nome || '').trim().replace(/\s+/g, ' ');
+  if (nome.split(' ').length < 2) er.nome = 'Informe o nome completo (nome e sobrenome).';
+  if (!validarCPF(dados.cpf)) er.cpf = 'CPF inválido. Confira os 11 dígitos.';
+  else if (S.pacientes.some(p => p.cpf === dados.cpf && p.id !== +dados.id)) er.cpf = 'Já existe um paciente cadastrado com este CPF.';
+  if (!dados.nascimento) er.nascimento = 'Informe a data de nascimento.';
+  else if (dados.nascimento > hoje()) er.nascimento = 'A data de nascimento não pode ser futura.';
+  if ((dados.telefone || '').replace(/\D/g, '').length < 10) er.telefone = 'Informe um telefone com DDD.';
+  if (dados.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(dados.email)) er.email = 'E-mail em formato inválido.';
+  if (Object.keys(er).length) { const e = new ErroNegocio('VAL', 'Corrija os campos destacados.'); e.porCampo = er; throw e; }
+  let p;
+  if (dados.id) { p = pac(dados.id); Object.assign(p, { nome, cpf: dados.cpf, nascimento: dados.nascimento, telefone: dados.telefone, email: dados.email.trim() }); auditar('Paciente atualizado', p.nome); }
+  else { p = { id: nextId('pac'), nome, cpf: dados.cpf, nascimento: dados.nascimento, telefone: dados.telefone, email: dados.email.trim(), criadoEm: Date.now() }; S.pacientes.push(p); auditar('Paciente cadastrado', p.nome); }
+  salvar(); return p;
+}
+
+/** RF02 · Médicos e especialidades */
+function salvarEspecialidade(nome) {
+  exigir('medicos.gerir', 'cadastrar especialidades');
+  nome = (nome || '').trim();
+  if (nome.length < 3) throw new ErroNegocio('VAL', 'Informe o nome da especialidade.', ['nome']);
+  if (S.especialidades.some(e => norm(e.nome) === norm(nome))) throw new ErroNegocio('VAL', 'Esta especialidade já está cadastrada.', ['nome']);
+  const e = { id: nextId('esp'), nome }; S.especialidades.push(e); auditar('Especialidade cadastrada', nome); salvar(); return e;
+}
+async function salvarMedico(d) {
+  exigir('medicos.gerir', 'cadastrar médicos');
+  const er = {};
+  if ((d.nome || '').trim().split(/\s+/).length < 2) er.nome = 'Informe o nome completo.';
+  if (!/^CRM\/[A-Z]{2}\s?\d{4,6}$/i.test((d.crm || '').trim())) er.crm = 'Use o formato CRM/UF 123456.';
+  else if (S.medicos.some(m => norm(m.crm).replace(/\s/g, '') === norm(d.crm).replace(/\s/g, '') && m.id !== +d.id)) er.crm = 'CRM já cadastrado.';
+  if (!esp(d.especialidadeId)) er.especialidadeId = 'Selecione a especialidade.';
+  if (!d.id && d.criarUsuario) {
+    if (!/^[a-z0-9._-]{3,}$/.test(d.login || '')) er.login = 'Login com 3+ caracteres (letras minúsculas, números, ponto).';
+    else if (S.usuarios.some(u => u.login === d.login)) er.login = 'Login já em uso.';
+    if ((d.senha || '').length < 8) er.senha = 'A senha deve ter ao menos 8 caracteres.';
+  }
+  if (Object.keys(er).length) { const e = new ErroNegocio('VAL', 'Corrija os campos destacados.'); e.porCampo = er; throw e; }
+  let m;
+  if (d.id) {
+    m = med(d.id);
+    Object.assign(m, { nome: d.nome.trim(), crm: d.crm.trim().toUpperCase(), especialidadeId: +d.especialidadeId, duracao: +d.duracao });
+    auditar('Médico atualizado', m.nome);
+  } else {
+    m = { id: nextId('med'), nome: d.nome.trim(), crm: d.crm.trim().toUpperCase(), especialidadeId: +d.especialidadeId, duracao: +d.duracao, ativo: true };
+    S.medicos.push(m); auditar('Médico cadastrado', `${m.nome} · ${esp(m.especialidadeId).nome}`);
+    if (d.criarUsuario) { await criarUsuarioBruto({ login: d.login, nome: m.nome, perfil: 'medico', senha: d.senha, medicoId: m.id }); auditar('Usuário criado', `${d.login} (médico)`); }
+  }
+  salvar(); return m;
+}
+function alternarMedico(id) {
+  exigir('medicos.gerir', 'alterar médicos');
+  const m = med(id);
+  if (m.ativo && S.consultas.some(c => c.medicoId === m.id && ativa(c) && futura(c)))
+    throw new ErroNegocio('VAL', `${m.nome} possui consultas futuras ativas. Remarque ou cancele-as antes de inativar o cadastro.`);
+  m.ativo = !m.ativo; auditar(m.ativo ? 'Médico reativado' : 'Médico inativado', m.nome); salvar();
+}
+
+/** Agenda do médico (classe Agenda) */
+function adicionarDisponibilidade(d) {
+  exigir('agendas.gerir', 'definir disponibilidade');
+  const er = {};
+  if (!med(d.medicoId)) er.medicoId = 'Selecione o médico.';
+  if (!d.de) er.de = 'Informe a data inicial.'; else if (d.de < hoje()) er.de = 'A data inicial não pode estar no passado.';
+  if (!d.ate) er.ate = 'Informe a data final.'; else if (d.de && d.ate < d.de) er.ate = 'A data final deve ser igual ou posterior à inicial.';
+  else if (d.de && (parse(d.ate) - parse(d.de)) / 864e5 > 120) er.ate = 'Período máximo de 120 dias por vez.';
+  if (!d.dias.length) er.dias = 'Marque ao menos um dia da semana.';
+  if (!d.ini || !d.fim) er.fim = 'Informe início e fim do expediente.';
+  else if (toMin(d.fim) - toMin(d.ini) < (med(d.medicoId)?.duracao || 30)) er.fim = 'O expediente deve comportar ao menos uma consulta.';
+  if (Object.keys(er).length) { const e = new ErroNegocio('VAL', 'Corrija os campos destacados.'); e.porCampo = er; throw e; }
+  let criadas = 0, sobrepostas = [];
+  for (let dt = d.de; dt <= d.ate; dt = addDias(dt, 1)) {
+    if (!d.dias.includes(parse(dt).getDay())) continue;
+    const sob = S.agendas.some(a => a.medicoId === +d.medicoId && a.data === dt && toMin(d.ini) < toMin(a.horaFim) && toMin(a.horaInicio) < toMin(d.fim));
+    if (sob) { sobrepostas.push(fData(dt)); continue; }
+    S.agendas.push({ id: nextId('ag'), medicoId: +d.medicoId, data: dt, horaInicio: d.ini, horaFim: d.fim }); criadas++;
+  }
+  auditar('Disponibilidade cadastrada', `${med(d.medicoId).nome} · ${criadas} dia(s) · ${d.ini}–${d.fim}`);
+  salvar(); return { criadas, sobrepostas };
+}
+function removerDisponibilidade(id) {
+  exigir('agendas.gerir', 'alterar disponibilidade');
+  const a = S.agendas.find(x => x.id === +id);
+  const m = med(a.medicoId);
+  const afetadas = S.consultas.filter(c => c.medicoId === a.medicoId && c.data === a.data && ativa(c) && toMin(c.horario) >= toMin(a.horaInicio) && toMin(c.horario) < toMin(a.horaFim));
+  if (afetadas.length) throw new ErroNegocio('RN02', `Há ${afetadas.length} consulta(s) ativa(s) neste período. Remarque ou cancele-as antes de remover a disponibilidade (RN02).`);
+  S.agendas = S.agendas.filter(x => x.id !== a.id);
+  auditar('Disponibilidade removida', `${m.nome} · ${fData(a.data)} ${a.horaInicio}–${a.horaFim}`); salvar();
+}
+
+/** RF08 · Autenticação */
+async function login(loginTxt, senha) {
+  loginTxt = (loginTxt || '').trim().toLowerCase();
+  if (!loginTxt || !senha) throw new ErroNegocio('FA04', 'Informe usuário e senha.');
+  const t = S.tentativas[loginTxt] || { n: 0, ate: 0 };
+  if (t.ate > Date.now()) { const s = Math.ceil((t.ate - Date.now()) / 1000); throw new ErroNegocio('BLQ', `Acesso temporariamente bloqueado por excesso de tentativas. Tente novamente em ${Math.floor(s / 60)}min ${s % 60}s.`); }
+  const u = S.usuarios.find(x => x.login === loginTxt);
+  const ok = u && u.ativo && (await hashSenha(senha, u.salt)) === u.senhaHash;
+  if (!ok) {
+    t.n++; if (t.n >= MAX_TENT) { t.ate = Date.now() + BLOQ_MIN * 60000; t.n = 0; }
+    S.tentativas[loginTxt] = t;
+    S.auditoria.unshift({ ts: Date.now(), usuario: loginTxt, perfil: '-', acao: 'Falha de autenticação', detalhe: u && !u.ativo ? 'usuário inativo' : 'usuário ou senha inválidos' });
+    salvar();
+    const rest = t.ate > Date.now() ? 0 : MAX_TENT - t.n;
+    throw new ErroNegocio('AUT', u && !u.ativo ? 'Este usuário está inativo. Procure o administrador.' : `Usuário ou senha inválidos.${rest ? ` Restam ${rest} tentativa(s) antes do bloqueio temporário.` : ` Acesso bloqueado por ${BLOQ_MIN} minutos.`}`);
+  }
+  delete S.tentativas[loginTxt];
+  u.ultimoAcesso = Date.now();
+  SESSAO = { userId: u.id, ultimo: Date.now() }; salvarSessao();
+  auditar('Login', `Perfil ${PERFIS[u.perfil]}`);
+  if (pode('backup')) backupAutomaticoSeNecessario();
+  salvar(); return u;
+}
+function logout(motivo) {
+  if (SESSAO) auditar('Logout', motivo || 'Encerrado pelo usuário');
+  SESSAO = null; salvarSessao(); salvar();
+  AG = agNovo();
+  location.hash = '';
+  render();
+  if (motivo) toast(motivo, 'warn');
+}
+
+/** RNF04 · Backup e restauração */
+function dadosDominio() { const { backups, auditoria, tentativas, ...resto } = S; return clone(resto); }
+function criarBackup(tipo = 'Manual') {
+  if (tipo === 'Manual') exigir('backup', 'gerar backup');
+  const u = usuarioAtual();
+  const b = { id: nextId('bkp'), ts: Date.now(), autor: u ? u.login : 'sistema', tipo, dados: JSON.stringify(dadosDominio()) };
+  S.backups.unshift(b); if (S.backups.length > 12) S.backups.length = 12;
+  auditar('Backup gerado', `${tipo} · ${(b.dados.length / 1024).toFixed(1)} KB`); salvar(); return b;
+}
+function backupAutomaticoSeNecessario() { const ult = S.backups[0]; if (!ult || Date.now() - ult.ts > 864e5) criarBackup('Automático (diário)'); }
+function validarEstrutura(o) { return o && ['especialidades', 'medicos', 'pacientes', 'agendas', 'consultas', 'usuarios', 'permissoes', 'seq'].every(k => k in o); }
+function restaurarDados(json, origem) {
+  exigir('backup', 'restaurar dados');
+  let o; try { o = typeof json === 'string' ? JSON.parse(json) : json; } catch (e) { throw new ErroNegocio('BKP', 'O conteúdo informado não é um JSON válido.'); }
+  if (!validarEstrutura(o)) throw new ErroNegocio('BKP', 'O arquivo não corresponde a um backup do SGC (estrutura incompleta).');
+  criarBackup('Pré-restauração (automático)');
+  const keep = { backups: S.backups, auditoria: S.auditoria, tentativas: S.tentativas };
+  S = Object.assign(clone(o), keep);
+  S.notificacoes = S.notificacoes || [];
+  if (!S.usuarios.some(u => u.id === SESSAO.userId)) { logout('Sessão encerrada: seu usuário não existe no backup restaurado.'); return; }
+  auditar('Dados restaurados', origem); salvar();
+}
+
+/* =====================================================================
+   INTERFACE
+   ===================================================================== */
+const NAV = [
+  { sec: 1 },
+  { id: 'inicio', l: 'Hoje', p: 'dashboard' },
+  { id: 'agendar', l: 'Agendar', p: 'consultas.agendar' },
+  { id: 'consultas', l: 'Consultas', p: 'consultas.ver' },
+  { id: 'pacientes', l: 'Pacientes', p: 'pacientes.ver' },
+  { id: 'minha-agenda', l: 'Minha agenda', p: 'agenda.propria' },
+  { id: 'minhas-consultas', l: 'Minhas consultas', p: 'consultas.proprias' },
+  { sec: 2 },
+  { id: 'medicos', l: 'Médicos', p: 'medicos.ver' },
+  { id: 'agendas', l: 'Agendas', p: 'agendas.ver' },
+  { sec: 3 },
+  { id: 'usuarios', l: 'Usuários', p: 'usuarios.gerir' },
+  { id: 'backup', l: 'Backup', p: 'backup' },
+  { id: 'auditoria', l: 'Auditoria', p: 'auditoria' },
+  { sec: 4 },
+  { id: 'requisitos', l: 'Rastreabilidade', p: null },
+];
+const podeNav = n => n.id && (n.p === null || pode(n.p));
+
+function toast(msg, tipo = '') {
+  const t = document.createElement('div'); t.className = 'toast ' + tipo; t.textContent = msg;
+  $('#toasts').appendChild(t); setTimeout(() => t.remove(), tipo === 'err' ? 6500 : 4200);
+}
+function abrirModal(titulo, corpo, rodape = '', classe = '') {
+  $('#modalRoot').innerHTML = `<div class="ovl" data-act="modal-fundo"><div class="modal ${classe}" role="dialog" aria-modal="true" aria-labelledby="mTit">
+    <header><h2 id="mTit">${titulo}</h2><button class="x" data-act="modal-fechar" aria-label="Fechar">×</button></header>
+    <div class="mbody">${corpo}</div>${rodape ? `<footer>${rodape}</footer>` : ''}</div></div>`;
+  const f = $('#modalRoot .in'); if (f) setTimeout(() => f.focus(), 30);
+}
+const fecharModal = () => { $('#modalRoot').innerHTML = ''; };
+let PEND = null;
+function perguntar(titulo, msg, rotulo, fn, perigo) {
+  PEND = fn;
+  abrirModal(titulo, `<p style="margin:0">${msg}</p>`, `<button class="btn" data-act="modal-fechar">Voltar</button><button class="btn ${perigo ? 'dan solid' : 'pri'}" data-act="pend-ok">${rotulo}</button>`);
+}
+function mostrarErrosCampos(form, porCampo) {
+  $$('.ferr', form).forEach(e => e.remove()); $$('.invalid', form).forEach(e => e.classList.remove('invalid'));
+  Object.entries(porCampo || {}).forEach(([k, msg]) => {
+    const inp = form.querySelector(`[name="${k}"]`); if (!inp) return;
+    const lab = inp.closest('label') || inp.parentElement; lab.classList.add('invalid');
+    lab.insertAdjacentHTML('beforeend', `<small class="ferr">${esc(msg)}</small>`);
+  });
+  const first = form.querySelector('.invalid .in'); if (first) first.focus();
+}
+const pill = st => `<span class="pill ${STATUS[st].c}">${STATUS[st].l}</span>`;
+const medLabel = m => `${esc(m.nome)}<br><span class="muted small">${esc(esp(m.especialidadeId).nome)}</span>`;
+
+/* --------- render principal --------- */
+function render() {
+  const app = $('#app');
+  if (!usuarioAtual()) { app.innerHTML = viewLogin(); return; }
+  const u = usuarioAtual();
+  const r = location.hash.slice(1);
+  let item = NAV.find(n => n.id === r);
+  if (item && !podeNav(item)) { toast('Acesso negado: seu perfil não tem permissão para esta área. (RF08 · RN04)', 'err'); item = null; }
+  if (!item) item = NAV.find(podeNav);
+  const nav = NAV.map(n => n.sec ? '<span class="grp"></span>' : podeNav(n) ? `<a href="#${n.id}" class="${n.id === item.id ? 'on' : ''}" ${n.id === item.id ? 'aria-current="page"' : ''}>${n.l}</a>` : '').join('')
+    .replace(/^(<span class="grp"><\/span>)+/, '').replace(/(<span class="grp"><\/span>)+(?=<span class="grp">|$)/g, '');
+  app.innerHTML = `<header class="top"><div class="top-row"><div class="brand"><span class="cross" aria-hidden="true"></span>${CLINICA.nome}</div>
+      <span class="seguro" title="Em produção: HTTPS/TLS 1.2+, senhas com hash e sessão com expiração"><i></i>Sessão protegida, expira após ${SESSAO_MIN} min sem uso</span>
+      <div class="who"><span><b>${esc(u.nome)}</b> <span class="perfil">${PERFIS[u.perfil]}</span></span><button class="btn-sair" data-act="sair">Sair</button></div></div>
+    <nav class="tabs" aria-label="Menu principal">${nav}</nav></header>
+    <main id="main"></main>`;
+  VIEWS[item.id]();
+  window.scrollTo(0, 0);
+}
+
+/* --------- LOGIN --------- */
+function viewLogin() {
+  const demo = [['admin', 'admin123', 'Administrador'], ['recepcao', 'recep123', 'Recepcionista'], ['dr.ana', 'medico123', 'Médica, Dra. Ana Souza'], ['dr.carlos', 'medico123', 'Médico, Dr. Carlos Mendes'], ['maria', 'paciente123', 'Paciente, Maria Oliveira']];
+  const amanha = addDias(hoje(), 1);
+  return `<div class="login">
+    <section class="login-art"><div class="brand"><span class="cross" aria-hidden="true"></span>${CLINICA.nome}</div>
+      <h1>A agenda da clínica, sem rasura.</h1>
+      <p>Pacientes, médicos e consultas no mesmo lugar. Cada horário marcado uma única vez, e cada paciente sabe quando voltar.</p>
+      <div class="apcard" aria-hidden="true" style="transform:rotate(-1.5deg)"><div class="ttl">Cartão de consulta <small>${CLINICA.nome}</small></div>
+        <div class="ln"><span>Paciente</span><b>Maria Oliveira</b></div><div class="ln"><span>Médico</span><b>Dra. Ana Souza</b></div>
+        <div class="pair"><div class="ln"><span>Dia</span><b>${fData(amanha).slice(0, 5)}</b></div><div class="ln"><span>Hora</span><b>08:30</b></div></div>
+        <span class="stamp">AGENDADA</span></div>
+      <p class="small" style="margin-top:8px">Protótipo acadêmico do Projeto de Engenharia de Software (RUP). Brenda Mendes Araujo e Matheus Guimarães Liporace.</p></section>
+    <section class="login-side"><div class="login-card">
+      <h2 style="font-size:1.6rem;margin-bottom:4px">Entrar</h2><p class="sub">Use seu usuário e senha da clínica.</p>
+      <form data-sub="login" novalidate>
+        <label class="f">Usuário<input class="in" name="login" autocomplete="username" autofocus></label>
+        <label class="f">Senha<input class="in" name="senha" type="password" autocomplete="current-password"></label>
+        <div id="loginMsg" aria-live="assertive"></div>
+        <button class="btn pri lg" type="submit">Entrar</button>
+      </form>
+      <div class="demo"><p>Contas de demonstração (clique para preencher)</p>
+        ${demo.map(([l, s, d]) => `<button data-act="demo" data-l="${l}" data-s="${s}"><span><b>${l}</b> <span class="muted small">/ ${s}</span></span><span class="muted small">${d}</span></button>`).join('')}</div>
+      <p class="small muted" style="margin-top:14px">Após ${MAX_TENT} tentativas inválidas o acesso é bloqueado por ${BLOQ_MIN} minutos. <button class="btn link small" data-act="sobre-proto">Sobre o protótipo</button></p>
+    </div></section></div>`;
+}
+
+/* --------- PAINEL --------- */
+function viewInicio() {
+  const h = hoje(), sem = addDias(h, 7);
+  const hojeC = S.consultas.filter(c => c.data === h).sort((a, b) => a.horario.localeCompare(b.horario));
+  const prox = S.consultas.filter(c => ativa(c) && c.data >= h && c.data <= sem);
+  const conf = prox.filter(c => c.status === 'confirmada').length;
+  const canc30 = S.consultas.filter(c => c.status === 'cancelada' && c.data >= addDias(h, -30) && c.data <= h).length;
+  const ocup = S.medicos.filter(m => m.ativo).map(m => { const r = horariosDisponiveis(m.id, h); const o = r.slots.filter(s => s.consulta).length; return { m, tot: r.slots.length, o }; }).filter(x => x.tot);
+  $('#main').innerHTML = `<h1>Hoje na clínica</h1><p class="sub">${fDataL(h)}</p>
+  <div class="grid g4">
+    <div class="kpi"><div class="v">${hojeC.filter(ativa).length}</div><div class="l">Consultas ativas hoje</div></div>
+    <div class="kpi"><div class="v">${prox.length}</div><div class="l">Próximos 7 dias</div></div>
+    <div class="kpi"><div class="v">${prox.length ? Math.round(conf / prox.length * 100) : 0}%</div><div class="l">Confirmadas (7 dias)</div></div>
+    <div class="kpi"><div class="v">${canc30}</div><div class="l">Cancelamentos (30 dias)</div></div>
+  </div>
+  <div class="grid" style="grid-template-columns:1.6fr 1fr;margin-top:16px">
+    <div class="card"><div class="card-h"><h2>Consultas de hoje</h2>${pode('consultas.agendar') ? '<a class="btn pri sm" href="#agendar">Agendar consulta</a>' : ''}</div>
+      ${hojeC.length ? `<div class="tw"><table><thead><tr><th>Hora</th><th>Paciente</th><th>Médico</th><th>Status</th><th></th></tr></thead><tbody>
+      ${hojeC.map(c => `<tr><td class="mono">${c.horario}</td><td>${esc(pac(c.pacienteId).nome)}</td><td>${medLabel(med(c.medicoId))}</td><td>${pill(c.status)}</td><td><button class="btn sm" data-act="det-cons" data-id="${c.id}">Detalhes</button></td></tr>`).join('')}
+      </tbody></table></div>` : '<div class="empty">Nenhuma consulta para hoje.</div>'}</div>
+    <div class="card"><h2 style="margin-bottom:12px">Ocupação das agendas hoje</h2>
+      ${ocup.length ? ocup.map(x => `<div style="margin-bottom:12px"><div class="row small"><b>${esc(x.m.nome)}</b><span class="sp"></span><span class="muted">${x.o}/${x.tot} horários</span></div><div class="bar"><i style="width:${Math.round(x.o / x.tot * 100)}%"></i></div></div>`).join('') : '<div class="empty">Nenhum médico com agenda hoje.</div>'}
+      <div class="note">${S.pacientes.length} pacientes, ${S.medicos.filter(m => m.ativo).length} médicos ativos e ${S.especialidades.length} especialidades cadastradas.</div></div>
+  </div>`;
+}
+
+/* --------- AGENDAR (UC01) --------- */
+const agNovo = () => ({ pacienteId: null, busca: '', especialidadeId: '', medicoId: '', data: hoje(), horario: '', erros: [], msg: null, simular: false });
+let AG = null;
+function viewAgendar() {
+  if (!AG) AG = agNovo();
+  $('#main').innerHTML = `<h1>Agendar consulta</h1><p class="sub">Preencha a ficha de cima para baixo. O cartão ao lado mostra como a consulta vai ficar para o paciente.</p>
+  <div class="ag"><div class="ficha">
+    <section class="step" id="stPac"></section>
+    <section class="step" id="stMed"></section>
+    <section class="step" id="stHor"></section>
+  </div><aside class="resumo" id="agRes"></aside></div>`;
+  agRender();
+}
+function stepHTML(n, titulo, corpo, extra = '') { return `<div class="gut"><span class="num">${n}</span></div><div class="bd"><header><h2>${titulo}</h2>${extra}</header>${corpo}</div>`; }
+function agRender(partes = ['pac', 'med', 'hor', 'res']) {
+  const inv = k => AG.erros.includes(k);
+  if (partes.includes('pac')) {
+    const el = $('#stPac'); const p = pac(AG.pacienteId);
+    el.className = 'step' + (p ? ' done' : '') + (inv('paciente') ? ' invalid' : '');
+    el.innerHTML = stepHTML(1, 'Paciente', p
+      ? `<div class="sel"><div class="av">${iniciais(p.nome)}</div><div style="flex:1;min-width:0"><div class="nome">${esc(p.nome)}</div><div class="small muted">CPF ${p.cpf}, tel. ${p.telefone}${p.email ? ', ' + esc(p.email) : ''}</div></div><button class="btn sm" data-act="ag-trocar-pac">Trocar paciente</button></div>`
+      : `<label class="f" style="margin:0">Buscar paciente cadastrado <span class="req">*</span>
+          <input class="in" id="agBusca" data-inp="ag-busca" placeholder="Nome ou CPF" value="${esc(AG.busca)}" autocomplete="off"></label>
+         <div id="agPacRes">${agPacRes()}</div>`);
+  }
+  if (partes.includes('med')) {
+    const el = $('#stMed'); const m = med(AG.medicoId);
+    el.className = 'step' + (m ? ' done' : '') + (inv('medico') ? ' invalid' : '');
+    const meds = S.medicos.filter(x => x.ativo && (!AG.especialidadeId || x.especialidadeId === +AG.especialidadeId));
+    el.innerHTML = stepHTML(2, 'Especialidade e médico', `<div class="grid g2"><label class="f" style="margin:0">Especialidade
+        <select class="in" data-chg="ag-esp"><option value="">Todas as especialidades</option>${S.especialidades.map(e => `<option value="${e.id}" ${+AG.especialidadeId === e.id ? 'selected' : ''}>${esc(e.nome)}</option>`).join('')}</select></label>
+      <label class="f" style="margin:0">Médico <span class="req">*</span>
+        <select class="in" data-chg="ag-med"><option value="">Selecione o médico</option>${meds.map(x => `<option value="${x.id}" ${+AG.medicoId === x.id ? 'selected' : ''}>${esc(x.nome)}${AG.especialidadeId ? '' : ' (' + esc(esp(x.especialidadeId).nome) + ')'}</option>`).join('')}</select></label></div>
+      ${m ? `<p class="small muted" style="margin:10px 0 0">${esc(m.crm)}, consultas de ${m.duracao} minutos</p>` : ''}`);
+  }
+  if (partes.includes('hor')) {
+    const el = $('#stHor');
+    el.className = 'step' + (AG.horario ? ' done' : '') + (inv('horario') || inv('data') ? ' invalid' : '');
+    let corpo;
+    if (!AG.medicoId) corpo = '<p class="muted" style="margin:0">Escolha um médico para ver os dias de atendimento e os horários livres.</p>';
+    else {
+      const r = horariosDisponiveis(AG.medicoId, AG.data);
+      corpo = `<div class="row"><span class="small muted">Próximos 14 dias. Para outra data:</span><input class="in" type="date" data-chg="ag-data" min="${hoje()}" value="${AG.data}" style="width:180px;margin:0" aria-label="Data"></div>
+        ${chipsDias(AG.medicoId, AG.data, 'ag-dia')}
+        <h3 style="margin:16px 0 0">Horários em ${fDataL(AG.data)} <span class="req" style="color:var(--alert)">*</span></h3>
+        ${slotsHTML(r, AG.horario, 'ag-hora')}
+        ${!r.livres.length ? sugestoesFA02(AG.medicoId, AG.data, r) : ''}
+        <div class="perf">Horários consultados em ${r.ms.toFixed(2).replace('.', ',')} ms (limite do RNF03: 3 s)</div>`;
+    }
+    el.innerHTML = stepHTML(3, 'Data e horário', corpo);
+  }
+  if (partes.includes('res')) {
+    const p = pac(AG.pacienteId), m = med(AG.medicoId);
+    const campo = (v, k, vazio) => v ? `<b>${v}</b>` : inv(k) ? `<b class="falta">obrigatório</b>` : `<b class="vazio">${vazio}</b>`;
+    const dt = AG.medicoId && AG.data ? fDataL(AG.data) : '';
+    $('#agRes').innerHTML = `<div class="apcard"><div class="ttl">Cartão de consulta <small>${CLINICA.nome}</small></div>
+        <div class="ln"><span>Paciente</span>${campo(p && esc(p.nome), 'paciente', 'a escolher')}</div>
+        <div class="ln"><span>Especialidade</span>${campo(m && esc(esp(m.especialidadeId).nome), 'medico', 'a escolher')}</div>
+        <div class="ln"><span>Médico</span>${campo(m && esc(m.nome), 'medico', 'a escolher')}</div>
+        <div class="pair"><div class="ln"><span>Dia</span>${campo(dt && fData(AG.data).slice(0, 5) + ' (' + dt.slice(0, 3) + ')', 'data', '—')}</div><div class="ln"><span>Hora</span>${campo(AG.horario, 'horario', '—')}</div></div>
+        <div class="foot">${CLINICA.endereco}. Chegue 15 minutos antes.</div></div>
+      ${AG.msg ? `<div class="msg ${AG.msg.t}" role="alert">${AG.msg.h}</div>` : ''}
+      <label class="sim"><input type="checkbox" class="cbx" data-chg="ag-sim" ${AG.simular ? 'checked' : ''}><span><b>Testar conflito (FA03).</b> Outro recepcionista vai reservar este mesmo horário um instante antes de você confirmar.</span></label>
+      <button class="btn mark lg" data-act="ag-confirmar">Confirmar agendamento</button>
+      <button class="btn lg" style="margin-top:10px;border-width:1px" data-act="ag-limpar">Limpar ficha</button>
+      <p class="note">Ao confirmar, o sistema confere o cadastro do paciente (RN03), a sua permissão (RN04), a agenda do médico (RN02) e se o horário continua livre (RN01). Depois registra a consulta e envia a confirmação ao paciente.</p>`;
+  }
+}
+function agPacRes() {
+  const q = AG.busca.trim();
+  if (q.replace(/\D/g, '').length < 3 && q.length < 2) return `<p class="small muted" style="margin:8px 0 0">Digite pelo menos 2 letras do nome ou 3 números do CPF.</p>`;
+  const nq = norm(q), dq = q.replace(/\D/g, '');
+  const res = S.pacientes.filter(p => norm(p.nome).includes(nq) || (dq.length >= 3 && p.cpf.replace(/\D/g, '').includes(dq))).slice(0, 8);
+  if (!res.length) return `<div class="msg warn"><b>Paciente não encontrado (FA01)</b>Nenhum cadastro corresponde a “${esc(q)}”. A consulta só pode ser confirmada para pacientes cadastrados (RN03).
+      ${pode('pacientes.editar') ? `<div style="margin-top:10px"><button class="btn sm pri" data-act="ag-novo-pac">Cadastrar paciente e continuar</button></div>` : ''}</div>`;
+  return `<div class="res-list">${res.map(p => `<button data-act="ag-sel-pac" data-id="${p.id}"><span><b>${esc(p.nome)}</b><br><span class="small muted">CPF ${p.cpf}, nascido(a) em ${fData(p.nascimento)}</span></span><span class="small muted">${p.telefone}</span></button>`).join('')}</div>`;
+}
+function chipsDias(medicoId, sel, act, n = 14) {
+  const h = hoje(); let out = '';
+  for (let i = 0; i < n; i++) {
+    const d = addDias(h, i); const r = horariosDisponiveis(medicoId, d); const dt = parse(d);
+    const cls = !r.temAgenda ? 'none' : !r.livres.length ? 'zero' : '';
+    out += `<button class="chip ${cls} ${d === sel ? 'on' : ''}" data-act="${act}" data-d="${d}" aria-pressed="${d === sel}" title="${r.temAgenda ? r.livres.length + ' horário(s) livre(s)' : 'Sem atendimento'}"><div class="w">${DS[dt.getDay()]}</div><div class="d">${dt.getDate()}</div><div class="n">${r.temAgenda ? r.livres.length + ' livre' + (r.livres.length === 1 ? '' : 's') : 'folga'}</div></button>`;
+  }
+  return `<div class="chips" role="group" aria-label="Próximos dias">${out}</div>`;
+}
+function slotsHTML(r, sel, act) {
+  if (!r.temAgenda) return '';
+  const porHora = new Map();
+  r.slots.forEach(s => { const k = s.hora.slice(0, 2); if (!porHora.has(k)) porHora.set(k, []); porHora.get(k).push(s); });
+  return `<div class="planner" role="group" aria-label="Horários">${[...porHora.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([h, ss]) => `<div class="hr"><span>${h}h</span><div>${ss.map(s => {
+    const dis = s.consulta || s.passado;
+    return `<button class="slot ${s.hora === sel ? 'on' : ''} ${s.passado && !s.consulta ? 'past' : ''}" data-act="${act}" data-h="${s.hora}" ${dis ? 'disabled' : ''} aria-pressed="${s.hora === sel}" title="${s.consulta ? 'Ocupado' : s.passado ? 'Horário já passou' : 'Livre'}">${s.hora}</button>`;
+  }).join('')}</div></div>`).join('')}</div>
+  <div class="legend"><span><i></i>Livre</span><span><i style="background:var(--marker)"></i>Escolhido</span><span><i style="border:1px dashed var(--rule)"></i>Ocupado ou passado</span></div>`;
+}
+function sugestoesFA02(medicoId, data, r) {
+  const m = med(medicoId);
+  const datas = []; for (let i = 0; i < 45 && datas.length < 4; i++) { const d = addDias(hoje(), i); if (d !== data && horariosDisponiveis(medicoId, d).livres.length) datas.push(d); }
+  const outros = S.medicos.filter(x => x.ativo && x.id !== m.id && x.especialidadeId === m.especialidadeId).map(x => ({ x, n: horariosDisponiveis(x.id, data).livres.length })).filter(o => o.n);
+  return `<div class="msg warn" role="status"><b>Médico sem disponibilidade (FA02)</b>${r.temAgenda ? `Os horários de ${esc(m.nome)} em ${fData(data)} estão ocupados ou já passaram.` : `${esc(m.nome)} não atende em ${fDataL(data)}.`} Escolha outra data ou outro médico.
+    ${datas.length ? `<div class="row" style="margin-top:10px"><span class="small"><b>Próximas datas livres:</b></span>${datas.map(d => `<button class="btn sm" data-act="ag-dia" data-d="${d}">${fDataL(d)}</button>`).join('')}</div>` : ''}
+    ${outros.length ? `<div class="row" style="margin-top:8px"><span class="small"><b>Mesma especialidade neste dia:</b></span>${outros.map(o => `<button class="btn sm" data-act="ag-outro-med" data-id="${o.x.id}">${esc(o.x.nome)} (${o.n} livres)</button>`).join('')}</div>` : ''}</div>`;
+}
+function cartaoHTML(c, carimbo) {
+  const p = pac(c.pacienteId), m = med(c.medicoId);
+  return `<div class="apcard" style="max-width:none"><div class="ttl">Cartão de consulta <small>código ${c.codigo}</small></div>
+    <div class="ln"><span>Paciente</span><b>${esc(p.nome)}</b></div>
+    <div class="ln"><span>Especialidade</span><b>${esc(esp(m.especialidadeId).nome)}</b></div>
+    <div class="ln"><span>Médico</span><b>${esc(m.nome)}, ${esc(m.crm)}</b></div>
+    <div class="pair"><div class="ln"><span>Dia</span><b>${fDataL(c.data)}</b></div><div class="ln"><span>Hora</span><b>${c.horario}</b></div></div>
+    <div class="foot">${CLINICA.nome}, ${CLINICA.endereco}. Chegue 15 minutos antes.</div>
+    ${carimbo ? `<span class="stamp ${carimbo === 'CANCELADA' ? 'cancel' : ''}">${carimbo}</span>` : ''}</div>`;
+}
+function abrirConfirmacao(c) {
+  const n = S.notificacoes.find(x => x.consultaId === c.id);
+  abrirModal('Consulta agendada', `
+    <p style="margin:0 0 16px">O horário foi reservado e a consulta está registrada com o código <b>${c.codigo}</b>.</p>
+    ${cartaoHTML(c, 'AGENDADA')}
+    ${n ? `<p class="small" style="margin:20px 0 0"><b>Confirmação enviada ao paciente</b> por ${n.canais.join(' e ')} (${esc(n.destino)}):</p><p class="small muted" style="margin:4px 0 0">“${esc(n.texto)}”</p>` : ''}`,
+    `<a class="btn" href="#consultas" data-act="modal-fechar">Ver consultas</a><button class="btn pri" data-act="modal-fechar">Agendar outra consulta</button>`);
+}
+
+/* --------- CONSULTAS --------- */
+let FC = null;
+function viewConsultas() {
+  if (!FC) FC = { de: hoje(), ate: addDias(hoje(), 30), medicoId: '', status: 'ativas', q: '' };
+  $('#main').innerHTML = `<div class="card-h"><div><h1>Consultas</h1><p class="sub" style="margin:0">Remarque ou cancele consultas (RF05).</p></div>${pode('consultas.agendar') ? '<a class="btn pri" href="#agendar">Agendar consulta</a>' : ''}</div>
+  <div class="card" style="margin:14px 0"><div class="grid" style="grid-template-columns:repeat(5,1fr)">
+    <label class="f" style="margin:0">De<input class="in" type="date" data-chg="fc" name="de" value="${FC.de}"></label>
+    <label class="f" style="margin:0">Até<input class="in" type="date" data-chg="fc" name="ate" value="${FC.ate}"></label>
+    <label class="f" style="margin:0">Médico<select class="in" data-chg="fc" name="medicoId"><option value="">Todos</option>${S.medicos.map(m => `<option value="${m.id}" ${+FC.medicoId === m.id ? 'selected' : ''}>${esc(m.nome)}</option>`).join('')}</select></label>
+    <label class="f" style="margin:0">Situação<select class="in" data-chg="fc" name="status">${[['ativas', 'Ativas'], ['todas', 'Todas'], ['agendada', 'Agendadas'], ['confirmada', 'Confirmadas'], ['cancelada', 'Canceladas'], ['realizada', 'Realizadas']].map(([v, l]) => `<option value="${v}" ${FC.status === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+    <label class="f" style="margin:0">Paciente / código<input class="in" data-inp="fc" name="q" value="${esc(FC.q)}" placeholder="Buscar…"></label>
+  </div></div><div id="tabCons"></div>`;
+  renderTabCons();
+}
+function renderTabCons() {
+  const nq = norm(FC.q);
+  const lista = S.consultas.filter(c => (!FC.de || c.data >= FC.de) && (!FC.ate || c.data <= FC.ate) && (!FC.medicoId || c.medicoId === +FC.medicoId)
+    && (FC.status === 'todas' || (FC.status === 'ativas' ? ativa(c) : c.status === FC.status))
+    && (!nq || norm(pac(c.pacienteId).nome).includes(nq) || norm(c.codigo).includes(nq)))
+    .sort((a, b) => (a.data + a.horario).localeCompare(b.data + b.horario));
+  $('#tabCons').innerHTML = lista.length ? `<p class="small muted" style="margin:0 0 8px">${lista.length} consulta(s)${lista.length > 300 ? ' — exibindo as 300 primeiras' : ''}</p><div class="tw"><table><thead><tr><th>Data</th><th>Hora</th><th>Paciente</th><th>Médico</th><th>Código</th><th>Situação</th><th style="text-align:right">Ações</th></tr></thead><tbody>
+    ${lista.slice(0, 300).map(c => { const fut = ativa(c) && futura(c); return `<tr><td>${fDataL(c.data)}</td><td class="mono">${c.horario}</td><td>${esc(pac(c.pacienteId).nome)}</td><td>${medLabel(med(c.medicoId))}</td><td class="mono">${c.codigo}</td><td>${pill(c.status)}</td>
+      <td style="text-align:right;white-space:nowrap"><button class="btn sm" data-act="det-cons" data-id="${c.id}">Detalhes</button>
+      ${fut && pode('consultas.remarcar') ? `<button class="btn sm" data-act="remarcar" data-id="${c.id}">Remarcar</button>` : ''}
+      ${fut && pode('consultas.cancelar') ? `<button class="btn sm dan" data-act="cancelar" data-id="${c.id}">Cancelar</button>` : ''}</td></tr>`; }).join('')}
+  </tbody></table></div>` : '<div class="card empty">Nenhuma consulta encontrada com os filtros selecionados.</div>';
+}
+function abrirDetalhes(id) {
+  const c = cons(id), p = pac(c.pacienteId), m = med(c.medicoId), u = usuarioAtual();
+  const cpf = u.perfil === 'medico' ? ocultarCPF(p.cpf) : p.cpf;
+  const nots = S.notificacoes.filter(n => n.consultaId === c.id);
+  const fut = ativa(c) && futura(c);
+  abrirModal(`Consulta ${c.codigo}`, `
+    <div class="row" style="margin-bottom:12px">${pill(c.status)}<span class="muted small">criada em ${fTs(c.criadaEm)} por ${esc(c.criadaPor)}</span></div>
+    <dl class="kv"><dt>Paciente</dt><dd>${esc(p.nome)}</dd><dt>CPF</dt><dd class="mono">${cpf}${u.perfil === 'medico' ? ' <span class="muted small">(mascarado — LGPD)</span>' : ''}</dd>
+      <dt>Contato</dt><dd>${u.perfil === 'medico' ? '<span class="muted">restrito à recepção</span>' : esc(p.telefone + (p.email ? ' · ' + p.email : ''))}</dd>
+      <dt>Médico</dt><dd>${esc(m.nome)} · ${esc(m.crm)}</dd><dt>Especialidade</dt><dd>${esc(esp(m.especialidadeId).nome)}</dd>
+      <dt>Data e horário</dt><dd>${fDataL(c.data)} às ${c.horario} (${m.duracao} min)</dd>
+      ${c.motivoCancelamento ? `<dt>Motivo</dt><dd>${esc(c.motivoCancelamento)}</dd>` : ''}</dl>
+    <h3 style="margin-top:16px">Histórico</h3><div class="tl">${c.historico.map(hh => `<div><b>${fTs(hh.ts)}</b> · ${esc(hh.txt)} <span class="muted">(${esc(hh.por)})</span></div>`).join('')}</div>
+    ${nots.length && u.perfil !== 'medico' ? `<h3 style="margin-top:12px">Comunicações ao paciente</h3>${nots.map(n => `<p class="small" style="margin:0 0 6px"><span class="pill pri">${n.tipo}</span> ${fTs(n.ts)} · ${n.canais.join(' + ')}</p>`).join('')}` : ''}`,
+    `${fut && pode('consultas.cancelar') ? `<button class="btn dan" data-act="cancelar" data-id="${c.id}">Cancelar</button>` : ''}
+     ${fut && pode('consultas.remarcar') ? `<button class="btn" data-act="remarcar" data-id="${c.id}">Remarcar</button>` : ''}
+     ${u.perfil === 'medico' && ativa(c) && c.data <= hoje() ? `<button class="btn pri" data-act="realizada" data-id="${c.id}">Registrar atendimento</button>` : ''}
+     <button class="btn ${u.perfil === 'medico' ? '' : 'pri'}" data-act="modal-fechar">Fechar</button>`, 'wide');
+}
+let RM = null;
+function abrirRemarcar(id) {
+  const c = cons(id); RM = { id: c.id, data: c.data, horario: '', erro: null };
+  abrirModal(`Remarcar consulta ${c.codigo}`, `<div id="rmBody"></div>`, `<button class="btn" data-act="modal-fechar">Voltar</button><button class="btn pri" data-act="rm-ok">Confirmar remarcação</button>`, 'wide');
+  renderRM();
+}
+function renderRM() {
+  const c = cons(RM.id), m = med(c.medicoId), r = horariosDisponiveis(c.medicoId, RM.data, c.id);
+  $('#rmBody').innerHTML = `<div class="msg info" style="margin-top:0">Atual: <b>${fDataL(c.data)} às ${c.horario}</b> com ${esc(m.nome)} · paciente ${esc(pac(c.pacienteId).nome)}</div>
+    <label class="f" style="margin:0">Nova data<input class="in" type="date" data-chg="rm-data" min="${hoje()}" value="${RM.data}" style="width:190px"></label>
+    ${chipsDias(c.medicoId, RM.data, 'rm-dia')}
+    ${r.temAgenda ? slotsHTML(r, RM.horario, 'rm-hora') : ''}
+    ${!r.livres.length ? `<div class="msg warn">${r.temAgenda ? 'Sem horários livres nesta data.' : `${esc(m.nome)} não atende nesta data.`} Escolha outro dia acima. (FA02)</div>` : ''}
+    ${RM.erro ? `<div class="msg err" role="alert">${esc(RM.erro)}</div>` : ''}
+    <p class="small muted" style="margin:10px 0 0">O horário anterior é liberado automaticamente e o paciente recebe a nova confirmação.</p>`;
+}
+
+/* --------- PACIENTES (RF01) --------- */
+let FP = '';
+function viewPacientes() {
+  $('#main').innerHTML = `<div class="card-h"><div><h1>Pacientes</h1><p class="sub" style="margin:0">Cadastro e atualização de dados (RF01).</p></div>${pode('pacientes.editar') ? '<button class="btn pri" data-act="novo-pac">Novo paciente</button>' : ''}</div>
+  <div class="card" style="margin:14px 0"><label class="f" style="margin:0">Buscar por nome ou CPF<input class="in" data-inp="fp" value="${esc(FP)}" placeholder="Ex.: Maria ou 123.456"></label></div><div id="tabPac"></div>`;
+  renderTabPac();
+}
+function renderTabPac() {
+  const nq = norm(FP), dq = FP.replace(/\D/g, '');
+  const l = S.pacientes.filter(p => !FP || norm(p.nome).includes(nq) || (dq && p.cpf.replace(/\D/g, '').includes(dq))).sort((a, b) => a.nome.localeCompare(b.nome));
+  $('#tabPac').innerHTML = l.length ? `<div class="tw"><table><thead><tr><th>Nome</th><th>CPF</th><th>Nascimento</th><th>Telefone</th><th>E-mail</th><th>Próx. consultas</th><th style="text-align:right">Ações</th></tr></thead><tbody>
+    ${l.map(p => { const n = S.consultas.filter(c => c.pacienteId === p.id && ativa(c) && c.data >= hoje()).length; return `<tr><td><b>${esc(p.nome)}</b></td><td class="mono">${p.cpf}</td><td>${fData(p.nascimento)}</td><td>${esc(p.telefone)}</td><td>${esc(p.email || '—')}</td><td>${n ? `<span class="pill info">${n}</span>` : '<span class="muted">—</span>'}</td>
+    <td style="text-align:right;white-space:nowrap">${pode('pacientes.editar') ? `<button class="btn sm" data-act="edit-pac" data-id="${p.id}">Editar</button>` : ''}${pode('consultas.agendar') ? ` <button class="btn sm pri" data-act="agendar-pac" data-id="${p.id}">Agendar</button>` : ''}</td></tr>`; }).join('')}
+  </tbody></table></div>` : `<div class="card empty">Nenhum paciente encontrado.${pode('pacientes.editar') ? ' <button class="btn link" data-act="novo-pac">Cadastrar novo paciente</button>' : ''}</div>`;
+}
+let PAC_CTX = null; // 'agendar' quando o cadastro vem do FA01
+function abrirFormPaciente(p, pre = {}) {
+  p = p || {}; const v = k => esc(p[k] ?? pre[k] ?? '');
+  abrirModal(p.id ? 'Atualizar paciente' : 'Cadastrar paciente', `
+    <form data-sub="pac" id="fPac" novalidate><input type="hidden" name="id" value="${p.id || ''}">
+      ${PAC_CTX === 'agendar' ? '<div class="msg info" style="margin-top:0">Após salvar, o paciente será selecionado e o agendamento continuará de onde parou (FA01).</div>' : ''}
+      <label class="f">Nome completo <span class="req">*</span><input class="in" name="nome" value="${v('nome')}" autocomplete="off"></label>
+      <div class="grid g2"><label class="f">CPF <span class="req">*</span><input class="in" name="cpf" data-mask="cpf" inputmode="numeric" value="${v('cpf')}" placeholder="000.000.000-00"></label>
+      <label class="f">Data de nascimento <span class="req">*</span><input class="in" type="date" name="nascimento" max="${hoje()}" value="${v('nascimento')}"></label></div>
+      <div class="grid g2"><label class="f">Telefone (celular) <span class="req">*</span><input class="in" name="telefone" data-mask="tel" inputmode="tel" value="${v('telefone')}" placeholder="(11) 90000-0000"></label>
+      <label class="f">E-mail<input class="in" name="email" type="email" value="${v('email')}" placeholder="nome@email.com"></label></div>
+      <p class="small muted" style="margin:0">Telefone e e-mail são usados para enviar confirmações de consulta. <span class="req">*</span> campos obrigatórios.</p>
+    </form>`, `<button class="btn" data-act="modal-fechar">Cancelar</button><button class="btn pri" type="submit" form="fPac">Salvar paciente</button>`);
+}
+
+/* --------- MÉDICOS E ESPECIALIDADES (RF02) --------- */
+function viewMedicos() {
+  const g = pode('medicos.gerir');
+  $('#main').innerHTML = `<div class="card-h"><div><h1>Médicos e especialidades</h1><p class="sub" style="margin:0">Cadastro de médicos e associação a especialidades (RF02).</p></div>${g ? '<button class="btn pri" data-act="novo-med">Novo médico</button>' : ''}</div>
+  <div class="grid" style="grid-template-columns:1fr 2.2fr;margin-top:14px;align-items:start">
+    <div class="card"><h2 style="margin-bottom:10px">Especialidades</h2>
+      ${S.especialidades.map(e => `<div class="row" style="padding:7px 0;border-bottom:1px solid var(--line2)"><span>${esc(e.nome)}</span><span class="sp"></span><span class="pill muted">${S.medicos.filter(m => m.especialidadeId === e.id && m.ativo).length} médico(s)</span></div>`).join('')}
+      ${g ? `<form data-sub="esp" id="fEsp" style="margin-top:14px" novalidate><label class="f" style="margin-bottom:8px">Nova especialidade<input class="in" name="nome" placeholder="Ex.: Neurologia"></label><button class="btn sm pri" type="submit">Adicionar</button></form>` : ''}</div>
+    <div class="tw"><table><thead><tr><th>Médico</th><th>CRM</th><th>Especialidade</th><th>Duração</th><th>Usuário</th><th>Situação</th>${g ? '<th></th>' : ''}</tr></thead><tbody>
+      ${S.medicos.map(m => { const u = S.usuarios.find(x => x.medicoId === m.id); return `<tr><td><b>${esc(m.nome)}</b></td><td class="mono">${esc(m.crm)}</td><td>${esc(esp(m.especialidadeId).nome)}</td><td>${m.duracao} min</td><td class="mono small">${u ? esc(u.login) : '<span class="muted">—</span>'}</td><td>${m.ativo ? '<span class="pill ok">Ativo</span>' : '<span class="pill muted">Inativo</span>'}</td>
+      ${g ? `<td style="white-space:nowrap;text-align:right"><button class="btn sm" data-act="edit-med" data-id="${m.id}">Editar</button> <button class="btn sm ${m.ativo ? 'dan' : ''}" data-act="tog-med" data-id="${m.id}">${m.ativo ? 'Inativar' : 'Reativar'}</button></td>` : ''}</tr>`; }).join('')}
+    </tbody></table></div></div>`;
+}
+function abrirFormMedico(m) {
+  m = m || {};
+  abrirModal(m.id ? 'Editar médico' : 'Cadastrar médico', `<form data-sub="med" id="fMed" novalidate><input type="hidden" name="id" value="${m.id || ''}">
+    <label class="f">Nome completo <span class="req">*</span><input class="in" name="nome" value="${esc(m.nome || '')}" placeholder="Dra. Nome Sobrenome"></label>
+    <div class="grid g2"><label class="f">CRM <span class="req">*</span><input class="in" name="crm" value="${esc(m.crm || '')}" placeholder="CRM/SP 123456"></label>
+    <label class="f">Especialidade <span class="req">*</span><select class="in" name="especialidadeId"><option value="">Selecione…</option>${S.especialidades.map(e => `<option value="${e.id}" ${m.especialidadeId === e.id ? 'selected' : ''}>${esc(e.nome)}</option>`).join('')}</select></label></div>
+    <label class="f">Duração padrão da consulta<select class="in" name="duracao">${[15, 20, 30, 40, 60].map(d => `<option value="${d}" ${(m.duracao || 30) === d ? 'selected' : ''}>${d} minutos</option>`).join('')}</select></label>
+    ${m.id ? '<p class="small muted" style="margin:0">Alterar a duração afeta apenas a geração de novos horários.</p>' : `<label class="row small" style="font-weight:600;margin-bottom:10px"><input type="checkbox" class="cbx" name="criarUsuario" checked> Criar acesso para o médico consultar a própria agenda (RF06)</label>
+    <div class="grid g2"><label class="f">Login<input class="in" name="login" placeholder="dr.nome" autocomplete="off"></label><label class="f">Senha inicial<input class="in" name="senha" type="password" placeholder="mín. 8 caracteres" autocomplete="new-password"></label></div>`}
+  </form>`, `<button class="btn" data-act="modal-fechar">Cancelar</button><button class="btn pri" type="submit" form="fMed">Salvar</button>`);
+}
+
+/* --------- AGENDAS (disponibilidade) --------- */
+let FAg = null;
+function viewAgendas() {
+  if (!FAg) FAg = { medicoId: S.medicos.find(m => m.ativo)?.id || '', ref: hoje() };
+  const g = pode('agendas.gerir');
+  const m = med(FAg.medicoId);
+  $('#main').innerHTML = `<h1>Agendas dos médicos</h1><p class="sub">Disponibilidade cadastrada e ocupação por semana (RF03 · RN02).</p>
+  <div class="card" style="margin-bottom:16px"><div class="row"><label class="f" style="margin:0;min-width:280px">Médico<select class="in" data-chg="fag-med">${S.medicos.map(x => `<option value="${x.id}" ${x.id === +FAg.medicoId ? 'selected' : ''}>${esc(x.nome)} — ${esc(esp(x.especialidadeId).nome)}${x.ativo ? '' : ' (inativo)'}</option>`).join('')}</select></label>
+    <span class="sp"></span>${g ? `<button class="btn pri" data-act="nova-disp">Cadastrar disponibilidade</button>` : '<span class="pill muted">Somente leitura para o seu perfil</span>'}</div></div>
+  ${m ? semanaHTML(m.id, FAg.ref, 'fag-sem', true) : ''}
+  ${m ? `<div class="card" style="margin-top:16px"><h2 style="margin-bottom:10px">Períodos cadastrados (próximos 30 dias)</h2>${listaDisp(m.id, g)}</div>` : ''}`;
+}
+function listaDisp(medicoId, g) {
+  const l = S.agendas.filter(a => a.medicoId === medicoId && a.data >= hoje() && a.data <= addDias(hoje(), 30)).sort((a, b) => (a.data + a.horaInicio).localeCompare(b.data + b.horaInicio));
+  if (!l.length) return '<div class="empty">Nenhuma disponibilidade cadastrada para os próximos 30 dias.</div>';
+  return `<div class="tw"><table><thead><tr><th>Data</th><th>Início</th><th>Fim</th><th>Horários</th><th>Ocupados</th>${g ? '<th></th>' : ''}</tr></thead><tbody>${l.map(a => {
+    const sl = slotsDaAgenda(a, med(medicoId).duracao); const oc = S.consultas.filter(c => c.medicoId === medicoId && c.data === a.data && ativa(c) && sl.includes(c.horario)).length;
+    return `<tr><td>${fDataL(a.data)}</td><td class="mono">${a.horaInicio}</td><td class="mono">${a.horaFim}</td><td>${sl.length}</td><td>${oc}</td>${g ? `<td style="text-align:right"><button class="btn sm dan" data-act="rem-disp" data-id="${a.id}">Remover</button></td>` : ''}</tr>`; }).join('')}</tbody></table></div>`;
+}
+function semanaHTML(medicoId, ref, act, mostrarPaciente) {
+  const d0 = parse(ref); const seg = addDias(ref, -((d0.getDay() + 6) % 7));
+  const dias = Array.from({ length: 7 }, (_, i) => addDias(seg, i));
+  const u = usuarioAtual();
+  const cols = dias.map(d => {
+    const r = horariosDisponiveis(medicoId, d);
+    const doDia = S.consultas.filter(c => c.medicoId === +medicoId && c.data === d && c.status !== 'cancelada');
+    const mapa = new Map(doDia.map(c => [c.horario, c]));
+    const horas = [...new Set([...r.slots.map(s => s.hora), ...doDia.map(c => c.horario)])].sort();
+    const evs = horas.map(hr => { const c = mapa.get(hr); const s = r.slots.find(x => x.hora === hr);
+      return c ? `<div class="ev ${c.status}" data-act="det-cons" data-id="${c.id}"><b>${hr}</b>${mostrarPaciente ? esc(pac(c.pacienteId).nome) : 'Ocupado'}</div>`
+               : `<div class="ev livre"><b>${hr}</b>${s && s.passado ? '—' : 'livre'}</div>`; }).join('');
+    const dt = parse(d);
+    return `<div class="day ${d === hoje() ? 'today' : ''}"><header><span>${DS[dt.getDay()]} ${pad(dt.getDate())}/${pad(dt.getMonth() + 1)}</span><span class="muted small">${r.slots.length ? doDia.length + '/' + r.slots.length : ''}</span></header>
+      <div class="b">${horas.length ? evs : '<span class="muted small" style="padding:4px">Sem atendimento</span>'}</div></div>`;
+  });
+  return `<div class="card"><div class="card-h"><h2>Semana de ${fData(seg)} a ${fData(dias[6])}</h2>
+    <div class="row"><button class="btn sm" data-act="${act}" data-n="-7">Semana anterior</button><button class="btn sm" data-act="${act}" data-n="0">Hoje</button><button class="btn sm" data-act="${act}" data-n="7">Próxima semana</button></div></div>
+    <div class="week">${cols.join('')}</div>
+    <div class="legend"><span><i style="background:var(--info-l);border-left:3px solid var(--info)"></i>Agendada</span><span><i style="background:var(--ok-l);border-left:3px solid var(--ok)"></i>Confirmada</span><span><i style="background:var(--line2)"></i>Realizada</span><span><i style="border:1px dashed #cfd9de"></i>Livre</span></div></div>`;
+}
+function abrirFormDisp() {
+  const m = med(FAg.medicoId);
+  abrirModal('Cadastrar disponibilidade', `<form data-sub="disp" id="fDisp" novalidate>
+    <label class="f">Médico<select class="in" name="medicoId">${S.medicos.filter(x => x.ativo).map(x => `<option value="${x.id}" ${x.id === m?.id ? 'selected' : ''}>${esc(x.nome)}</option>`).join('')}</select></label>
+    <div class="grid g2"><label class="f">De <span class="req">*</span><input class="in" type="date" name="de" min="${hoje()}" value="${hoje()}"></label><label class="f">Até <span class="req">*</span><input class="in" type="date" name="ate" min="${hoje()}" value="${addDias(hoje(), 28)}"></label></div>
+    <label class="f" style="margin-bottom:4px">Dias da semana <span class="req">*</span></label><div class="row" style="margin-bottom:12px">${[1, 2, 3, 4, 5, 6, 0].map(d => `<label class="row small" style="gap:5px"><input type="checkbox" class="cbx" name="dias" value="${d}" ${d >= 1 && d <= 5 ? 'checked' : ''}>${DS[d]}</label>`).join('')}<input type="hidden" name="dias_h"></div>
+    <div class="grid g2"><label class="f">Início do expediente<input class="in" type="time" name="ini" value="08:00" step="300"></label><label class="f">Fim do expediente<input class="in" type="time" name="fim" value="12:00" step="300"></label></div>
+    <p class="small muted" style="margin:0">Os horários de consulta são gerados conforme a duração padrão do médico. Dias com período sobreposto são ignorados.</p></form>`,
+    `<button class="btn" data-act="modal-fechar">Cancelar</button><button class="btn pri" type="submit" form="fDisp">Salvar disponibilidade</button>`);
+}
+
+/* --------- MINHA AGENDA (médico · RF06) --------- */
+let SEM_MED = null;
+function viewMinhaAgenda() {
+  const u = usuarioAtual(), m = med(u.medicoId);
+  if (!SEM_MED) SEM_MED = hoje();
+  const prox = S.consultas.filter(c => c.medicoId === m.id && ativa(c) && c.data === hoje()).sort((a, b) => a.horario.localeCompare(b.horario));
+  const semana = S.consultas.filter(c => c.medicoId === m.id && ativa(c) && c.data >= hoje() && c.data <= addDias(hoje(), 6)).length;
+  $('#main').innerHTML = `<h1>Minha agenda</h1><p class="sub">${esc(m.nome)}, ${esc(esp(m.especialidadeId).nome)}, ${esc(m.crm)}. Esta tela mostra somente a sua agenda (RF06).</p>
+  <div class="grid g3" style="margin-bottom:16px"><div class="kpi"><div class="v">${prox.length}</div><div class="l">Consultas hoje</div></div>
+    <div class="kpi"><div class="v">${semana}</div><div class="l">Próximos 7 dias</div></div>
+    <div class="kpi"><div class="v">${prox[0] ? prox.find(c => futura(c))?.horario || '—' : '—'}</div><div class="l">Próximo atendimento hoje</div></div></div>
+  ${semanaHTML(m.id, SEM_MED, 'med-sem', true)}
+  <p class="small muted">Clique em uma consulta para ver detalhes. Dados sensíveis do paciente (CPF, contato) são exibidos de forma restrita ao perfil médico.</p>`;
+}
+
+/* --------- MINHAS CONSULTAS (paciente · RF07) --------- */
+function viewMinhasConsultas() {
+  const u = usuarioAtual(), p = pac(u.pacienteId);
+  const minhas = S.consultas.filter(c => c.pacienteId === p.id).sort((a, b) => (a.data + a.horario).localeCompare(b.data + b.horario));
+  const prox = minhas.filter(c => ativa(c) && (c.data > hoje() || (c.data === hoje() && toMin(c.horario) >= agoraMin() - 30)));
+  const hist = minhas.filter(c => !prox.includes(c)).reverse();
+  const nots = S.notificacoes.filter(n => n.pacienteId === p.id);
+  $('#main').innerHTML = `<h1>Olá, ${esc(p.nome.split(' ')[0])}!</h1><p class="sub">Confirmações e dados das suas consultas (RF07).</p>
+  <div class="grid" style="grid-template-columns:1.5fr 1fr;align-items:start">
+  <div><h2 style="margin-bottom:10px">Próximas consultas</h2>
+    ${prox.length ? prox.map(c => `<div style="margin-bottom:26px">${cartaoHTML(c, c.status === 'confirmada' ? 'CONFIRMADA' : '')}
+      <div class="row" style="margin-top:14px">${c.status === 'agendada' ? `<button class="btn mark sm" data-act="conf-pres" data-id="${c.id}">Confirmar presença</button>` : '<span class="pill ok">Presença confirmada</span>'}
+      <span class="sp"></span><span class="small muted">Para remarcar ou cancelar, ligue ${CLINICA.telefone}</span></div></div>`).join('') : '<div class="card empty">Você não possui consultas agendadas.</div>'}
+    ${hist.length ? `<h2 style="margin:20px 0 10px">Histórico</h2><div class="tw"><table><thead><tr><th>Data</th><th>Médico</th><th>Situação</th></tr></thead><tbody>${hist.map(c => `<tr><td>${fData(c.data)} ${c.horario}</td><td>${medLabel(med(c.medicoId))}</td><td>${pill(c.status)}</td></tr>`).join('')}</tbody></table></div>` : ''}
+  </div>
+  <div class="card"><h2 style="margin-bottom:10px">Mensagens recebidas</h2>
+    ${nots.length ? nots.map(n => `<div style="padding:10px 0;border-bottom:1px solid var(--line2)"><div class="row small"><span class="pill pri">${n.tipo}</span><span class="muted">${fTs(n.ts)} · ${n.canais.join(' + ')}</span></div><p class="small" style="margin:6px 0 0">${esc(n.texto)}</p></div>`).join('') : '<div class="empty">Nenhuma mensagem.</div>'}
+    <p class="note">Contato cadastrado: ${esc(p.email || '—')} · ${esc(p.telefone)}</p></div></div>`;
+}
+
+/* --------- USUÁRIOS E PERMISSÕES (RF08 · RN04) --------- */
+function viewUsuarios() {
+  const perfis = Object.keys(PERFIS);
+  $('#main').innerHTML = `<div class="card-h"><div><h1>Usuários e permissões</h1><p class="sub" style="margin:0">Autenticação e autorização por perfil (RF08 · RN04).</p></div><button class="btn pri" data-act="novo-usr">Novo usuário</button></div>
+  <div class="card" style="margin-top:14px"><div class="card-h"><h2>Matriz de autorizações por perfil</h2><button class="btn sm" data-act="perm-padrao">Restaurar padrão</button></div>
+    <p class="small muted" style="margin-top:-6px">Alterações têm efeito imediato. Ex.: desmarque “Cancelar consultas” do Recepcionista e entre como <span class="mono">recepcao</span> para ver a regra RN04 aplicada.</p>
+    <div class="tw"><table><thead><tr><th>Permissão</th>${perfis.map(p => `<th style="text-align:center">${PERFIS[p]}</th>`).join('')}</tr></thead><tbody>
+    ${PERMS.map(([k, l]) => `<tr><td>${l} <span class="muted small mono">${k}</span></td>${perfis.map(p => { const trav = (PERM_TRAVADAS[p] || []).includes(k); return `<td style="text-align:center"><input type="checkbox" class="cbx" data-chg="perm" data-perfil="${p}" data-k="${k}" ${S.permissoes[p].includes(k) ? 'checked' : ''} ${trav ? 'disabled title="Permissão obrigatória para evitar bloqueio da administração"' : ''} aria-label="${l} — ${PERFIS[p]}"></td>`; }).join('')}</tr>`).join('')}
+    </tbody></table></div></div>
+  <div class="card"><h2 style="margin-bottom:10px">Usuários</h2><div class="tw"><table><thead><tr><th>Login</th><th>Nome</th><th>Perfil</th><th>Vínculo</th><th>Último acesso</th><th>Situação</th><th></th></tr></thead><tbody>
+    ${S.usuarios.map(u => `<tr><td class="mono">${esc(u.login)}</td><td>${esc(u.nome)}</td><td><span class="pill pri">${PERFIS[u.perfil]}</span></td><td class="small">${u.medicoId ? esc(med(u.medicoId)?.nome) : u.pacienteId ? esc(pac(u.pacienteId)?.nome) : '—'}</td><td class="small">${u.ultimoAcesso ? fTs(u.ultimoAcesso) : '—'}</td><td>${u.ativo ? '<span class="pill ok">Ativo</span>' : '<span class="pill muted">Inativo</span>'}</td>
+      <td style="text-align:right;white-space:nowrap"><button class="btn sm" data-act="senha-usr" data-id="${u.id}">Redefinir senha</button> ${u.id !== usuarioAtual().id ? `<button class="btn sm ${u.ativo ? 'dan' : ''}" data-act="tog-usr" data-id="${u.id}">${u.ativo ? 'Inativar' : 'Reativar'}</button>` : ''}</td></tr>`).join('')}
+  </tbody></table></div><p class="note">Senhas são armazenadas apenas como hash SHA-256 com salt individual — nunca em texto puro.</p></div>`;
+}
+function abrirFormUsuario() {
+  abrirModal('Novo usuário', `<form data-sub="usr" id="fUsr" novalidate>
+    <div class="grid g2"><label class="f">Nome <span class="req">*</span><input class="in" name="nome"></label><label class="f">Login <span class="req">*</span><input class="in" name="login" autocomplete="off"></label></div>
+    <div class="grid g2"><label class="f">Perfil <span class="req">*</span><select class="in" name="perfil" data-chg="usr-perfil">${Object.entries(PERFIS).map(([k, l]) => `<option value="${k}" ${k === 'recepcionista' ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+    <label class="f">Senha inicial <span class="req">*</span><input class="in" type="password" name="senha" autocomplete="new-password" placeholder="mín. 8 caracteres"></label></div>
+    <label class="f" id="usrVinc" style="display:none">Vínculo<select class="in" name="vinculo"></select></label></form>`,
+    `<button class="btn" data-act="modal-fechar">Cancelar</button><button class="btn pri" type="submit" form="fUsr">Criar usuário</button>`);
+}
+
+/* --------- BACKUP E SEGURANÇA (RNF02 · RNF04) --------- */
+function viewBackup() {
+  const json = JSON.stringify(dadosDominio(), null, 1);
+  $('#main').innerHTML = `<h1>Backup e segurança</h1><p class="sub">Rotinas de backup e restauração (RNF04) e proteção de dados pessoais (RNF02).</p>
+  <div class="grid g2" style="align-items:start">
+    <div class="card"><div class="card-h"><h2>Pontos de restauração</h2><button class="btn pri sm" data-act="bkp-novo">Gerar backup agora</button></div>
+      <p class="small muted" style="margin-top:-6px">Um backup automático é gerado diariamente no primeiro acesso de um administrador. São mantidas as 12 cópias mais recentes.</p>
+      ${S.backups.length ? `<div class="tw"><table><thead><tr><th>Data</th><th>Tipo</th><th>Tamanho</th><th></th></tr></thead><tbody>${S.backups.map(b => `<tr><td>${fTs(b.ts)}<div class="small muted">por ${esc(b.autor)}</div></td><td class="small">${esc(b.tipo)}</td><td class="small">${(b.dados.length / 1024).toFixed(1)} KB</td><td style="text-align:right"><button class="btn sm" data-act="bkp-rest" data-id="${b.id}">Restaurar</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Nenhum backup.</div>'}
+    </div>
+    <div class="card"><h2 style="margin-bottom:10px">Cópia externa (exportar / importar)</h2>
+      <label class="f">Dados atuais em JSON<textarea class="in" id="bkpOut" readonly>${esc(json)}</textarea></label>
+      <div class="row"><button class="btn sm" data-act="bkp-copiar">Copiar JSON</button><span class="small muted">${(json.length / 1024).toFixed(1)} KB</span></div>
+      <hr style="border:0;border-top:1px solid var(--line2);margin:16px 0">
+      <label class="f">Importar backup (arquivo .json)<input class="in" type="file" accept=".json,application/json" data-chg="bkp-arq"></label>
+      <label class="f">…ou cole o conteúdo<textarea class="in" id="bkpIn" placeholder='{"especialidades": [...], ...}' style="min-height:90px"></textarea></label>
+      <button class="btn sm pri" data-act="bkp-importar">Validar e restaurar</button></div>
+  </div>
+  <div class="card"><h2 style="margin-bottom:10px">Controles de segurança aplicados</h2>
+    <div class="grid g2 small">
+      <div><b>Autenticação</b><br>Login por usuário e senha; senhas com hash SHA-256 + salt; bloqueio de ${BLOQ_MIN} min após ${MAX_TENT} tentativas inválidas.</div>
+      <div><b>Autorização</b><br>Permissões verificadas na camada de serviço em toda operação (não apenas na interface) — RN04.</div>
+      <div><b>Sessão</b><br>Encerramento automático após ${SESSAO_MIN} min sem atividade; dados de sessão não ficam em cookies persistentes.</div>
+      <div><b>Comunicação</b><br>Em produção: HTTPS obrigatório (TLS 1.2+), HSTS e cabeçalhos de segurança. <span class="muted">No protótipo, os dados ficam somente no navegador.</span></div>
+      <div><b>Minimização (LGPD)</b><br>Perfil médico vê CPF mascarado e sem contatos; paciente acessa apenas os próprios dados.</div>
+      <div><b>Rastreabilidade</b><br>Trilha de auditoria de logins, falhas de acesso e alterações em consultas e cadastros.</div>
+    </div></div>`;
+}
+
+/* --------- AUDITORIA --------- */
+function viewAuditoria() {
+  $('#main').innerHTML = `<h1>Trilha de auditoria</h1><p class="sub">Registro de acessos e operações (RNF02 · RN04). Últimos ${S.auditoria.length} eventos.</p>
+  <div class="tw"><table><thead><tr><th>Data/hora</th><th>Usuário</th><th>Perfil</th><th>Ação</th><th>Detalhe</th></tr></thead><tbody>
+  ${S.auditoria.slice(0, 300).map(a => `<tr><td class="small" style="white-space:nowrap">${fTs(a.ts)}</td><td class="mono small">${esc(a.usuario)}</td><td class="small">${PERFIS[a.perfil] || '—'}</td><td><b class="${/Falha|negad/i.test(a.acao) ? '' : ''}" style="${/Falha|negad/i.test(a.acao) ? 'color:var(--err)' : ''}">${esc(a.acao)}</b></td><td class="small">${esc(a.detalhe)}</td></tr>`).join('')}
+  </tbody></table></div>`;
+}
+
+/* --------- RASTREABILIDADE --------- */
+const REQS = [
+  ['RF01', 'Cadastrar e atualizar dados dos pacientes', 'Tela Pacientes: inclusão/edição com validação de CPF (dígitos verificadores e unicidade), telefone, e-mail e nascimento.', 'pacientes', 'recepcao'],
+  ['RF02', 'Cadastrar médicos e associá-los a especialidades', 'Tela Médicos e especialidades: cadastro de especialidades, médicos (CRM, especialidade, duração) e criação do acesso do médico.', 'medicos', 'admin'],
+  ['RF03', 'Apresentar horários disponíveis por médico e data', 'Agendar consulta (passo 3) e Agendas: grade de horários livres/ocupados e contagem por dia.', 'agendar', 'recepcao'],
+  ['RF04', 'Recepcionista agenda consultas', 'Agendar consulta: fluxo completo do UC01 com resumo e confirmação.', 'agendar', 'recepcao'],
+  ['RF05', 'Remarcar ou cancelar consultas', 'Consultas: ações Remarcar (nova data/horário validados) e Cancelar (motivo obrigatório).', 'consultas', 'recepcao'],
+  ['RF06', 'Médicos visualizam suas próprias agendas', 'Minha agenda: visão semanal restrita ao médico autenticado.', 'minha-agenda', 'dr.ana'],
+  ['RF07', 'Paciente recebe confirmação e dados da consulta', 'Minhas consultas: código, data, médico, local, confirmação de presença e mensagens recebidas (e-mail/SMS simulados).', 'minhas-consultas', 'maria'],
+  ['RF08', 'Autenticar usuários e aplicar permissões por perfil', 'Login com hash de senha e bloqueio; menu e operações filtrados pela matriz de permissões.', 'usuarios', 'admin'],
+  ['RNF01', 'Acessível por navegadores Web atuais', 'Aplicação Web em HTML5/CSS/JS padrão, layout responsivo (desktop, tablet e celular).', null],
+  ['RNF02', 'Proteção de dados: autenticação, autorização e criptografia', 'Hash SHA-256+salt, sessão com expiração, checagem de permissão no serviço, mascaramento de CPF, auditoria; HTTPS em produção.', 'backup', 'admin'],
+  ['RNF03', 'Consulta de horários em até 3 s', 'Tempo de cada consulta de disponibilidade medido e exibido na tela de agendamento.', 'agendar', 'recepcao'],
+  ['RNF04', 'Rotinas de backup e restauração', 'Backup automático diário, backup manual, restauração de ponto e importação/exportação JSON.', 'backup', 'admin'],
+  ['RNF05', 'Campos e mensagens claros para a recepção', 'Campos obrigatórios marcados, máscaras de CPF/telefone, mensagens específicas por regra violada.', 'agendar', 'recepcao'],
+  ['RN01', 'Médico sem duas consultas ativas no mesmo dia e horário', 'Validação no serviço de agendamento/remarcação; horários ocupados ficam bloqueados na grade.', 'agendar', 'recepcao'],
+  ['RN02', 'Consulta somente dentro da disponibilidade do médico', 'Horários gerados a partir da Agenda; remoção de disponibilidade bloqueada se houver consultas.', 'agendas', 'admin'],
+  ['RN03', 'Paciente cadastrado para confirmar consulta', 'Agendamento exige paciente selecionado do cadastro; FA01 oferece cadastro imediato.', 'agendar', 'recepcao'],
+  ['RN04', 'Somente usuários com permissão incluem, remarcam ou cancelam', 'Função exigir() em cada operação; matriz editável pelo administrador.', 'usuarios', 'admin'],
+  ['FA01', 'Paciente não cadastrado', 'Busca sem resultado → aviso + “Cadastrar paciente e continuar”, retornando ao agendamento.', 'agendar', 'recepcao'],
+  ['FA02', 'Médico sem disponibilidade', 'Aviso com sugestões de próximas datas e outros médicos da mesma especialidade.', 'agendar', 'recepcao'],
+  ['FA03', 'Horário ocupado no momento da confirmação', 'Marque “Testar conflito” ao lado da ficha: o sistema rejeita, informa o conflito e atualiza a grade.', 'agendar', 'recepcao'],
+  ['FA04', 'Informações obrigatórias ausentes', 'Confirmar com dados faltando destaca as seções e impede o registro.', 'agendar', 'recepcao'],
+];
+function reqTabela(comLinks) {
+  return `<div class="tw"><table><thead><tr><th>ID</th><th>Requisito</th><th>Como o protótipo atende</th>${comLinks ? '<th>Testar</th>' : '<th>Perfil p/ testar</th>'}</tr></thead><tbody>
+  ${REQS.map(([id, d, como, rota, perfil]) => `<tr><td><span class="tag-req">${id}</span></td><td style="min-width:180px"><b>${d}</b></td><td class="small">${como}</td>
+    <td>${rota ? (comLinks && NAV.find(n => n.id === rota && podeNav(n)) ? `<a class="btn sm" href="#${rota}">Abrir</a>` : `<span class="mono small">${perfil}</span>`) : '<span class="muted small">—</span>'}</td></tr>`).join('')}
+  </tbody></table></div>`;
+}
+function viewRequisitos() {
+  $('#main').innerHTML = `<h1>Rastreabilidade de requisitos</h1><p class="sub">Mapeamento entre o documento de projeto (AC – SGC) e as funcionalidades deste protótipo.</p>
+  ${reqTabela(true)}
+  <div class="card" style="margin-top:16px"><h2 style="margin-bottom:8px">Roteiro rápido de validação do UC01</h2>
+  <ol class="small" style="margin:0;padding-left:20px;line-height:1.8">
+    <li>Entre como <span class="mono">recepcao / recep123</span> e abra <b>Agendar consulta</b>.</li>
+    <li>Busque “Zé Ninguém” → aparece o <b>FA01</b>; cadastre o paciente (CPF válido, ex.: 529.982.247-25) e o agendamento continua.</li>
+    <li>Escolha <b>Dermatologia → Dra. Paula Ferreira</b> numa segunda-feira → <b>FA02</b> com sugestões de datas.</li>
+    <li>Clique em <b>Confirmar</b> sem horário → <b>FA04</b> destaca os campos faltantes.</li>
+    <li>Selecione um horário, marque <b>Testar conflito</b> e confirme → <b>FA03 / RN01</b> rejeita e pede nova seleção.</li>
+    <li>Escolha outro horário e confirme → código gerado e mensagem enviada ao paciente (passos 8 e 9).</li>
+    <li>Entre como <span class="mono">dr.ana</span> (RF06) e como <span class="mono">maria</span> (RF07) para ver as visões restritas.</li>
+  </ol></div>
+  <div class="card"><h2 style="margin-bottom:8px">Modelo de domínio implementado (Figura 2)</h2>
+    <p class="small" style="margin:0"><b>Especialidade</b> 1—0..* <b>Médico</b> 1—0..* <b>Agenda</b> (data, horaInicio, horaFim, consultarDisponibilidade()) · <b>Médico</b> 1—0..* <b>Consulta</b> · <b>Paciente</b> 1—0..* <b>Consulta</b> (data, horário, status, confirmar(), cancelar(), remarcar()) · <b>Recepcionista</b> 1—0..* <b>Consulta</b> (agendarConsulta()). Usuário/perfil, Notificação, Backup e Auditoria complementam os requisitos não funcionais.</p>
+    <div class="row" style="margin-top:12px"><button class="btn sm dan" data-act="reset">Restaurar dados de demonstração</button><span class="small muted">Apaga as alterações feitas neste navegador.</span></div></div>`;
+}
+
+const VIEWS = { inicio: viewInicio, agendar: viewAgendar, consultas: viewConsultas, pacientes: viewPacientes, 'minha-agenda': viewMinhaAgenda, 'minhas-consultas': viewMinhasConsultas,
+  medicos: viewMedicos, agendas: viewAgendas, usuarios: viewUsuarios, backup: viewBackup, auditoria: viewAuditoria, requisitos: viewRequisitos };
+
+/* =====================================================================
+   EVENTOS
+   ===================================================================== */
+function tratarErro(e, alvoMsg) {
+  if (!(e instanceof ErroNegocio)) { console.error(e); toast('Erro inesperado: ' + e.message, 'err'); return; }
+  if (e.codigo === 'RN04') auditar('Operação negada', e.message);
+  if (alvoMsg) alvoMsg(e); else toast(e.message, 'err');
+  salvar();
+}
+const ACT = {
+  'modal-fechar': () => fecharModal(),
+  'modal-fundo': (el, ev) => { if (ev.target === el) fecharModal(); },
+  'pend-ok': () => { const f = PEND; PEND = null; fecharModal(); f && f(); },
+  'sair': () => logout(),
+  'demo': el => { const f = $('form[data-sub="login"]'); f.login.value = el.dataset.l; f.senha.value = el.dataset.s; f.senha.focus(); },
+  'sobre-proto': () => abrirModal('Sobre o protótipo', `<p class="small" style="margin-top:0">Protótipo navegável do <b>Sistema de Gestão de Clínica Médica (SGC)</b>, construído a partir do documento de projeto (AC – Exercício Integrado). Todos os dados são fictícios e ficam armazenados apenas neste navegador.</p>${reqTabela(false)}`, '<button class="btn pri" data-act="modal-fechar">Fechar</button>', 'wide'),
+  'reset': () => perguntar('Restaurar dados de demonstração', 'Todos os cadastros, consultas e alterações feitos neste navegador serão substituídos pelos dados iniciais. Deseja continuar?', 'Restaurar', async () => { await seed(); SESSAO = null; salvarSessao(); AG = null; FC = null; FAg = null; location.hash = ''; render(); toast('Dados de demonstração restaurados. Entre novamente.'); }, true),
+  // agendar
+  'ag-sel-pac': el => { AG.pacienteId = +el.dataset.id; AG.erros = AG.erros.filter(x => x !== 'paciente'); AG.msg = null; agRender(['pac', 'res']); },
+  'ag-trocar-pac': () => { AG.pacienteId = null; agRender(['pac', 'res']); $('#agBusca')?.focus(); },
+  'ag-novo-pac': () => { PAC_CTX = 'agendar'; const q = AG.busca.trim(); const dig = q.replace(/\D/g, ''); abrirFormPaciente(null, dig.length >= 3 && dig.length === q.replace(/[.\-\s]/g, '').length ? { cpf: mascara('cpf', dig) } : { nome: q }); },
+  'ag-dia': el => { AG.data = el.dataset.d; AG.horario = ''; AG.msg = null; agRender(['hor', 'res']); },
+  'ag-hora': el => { AG.horario = el.dataset.h; AG.erros = AG.erros.filter(x => x !== 'horario' && x !== 'data'); AG.msg = null; agRender(['hor', 'res']); },
+  'ag-outro-med': el => { AG.medicoId = el.dataset.id; AG.horario = ''; AG.msg = null; agRender(['med', 'hor', 'res']); },
+  'ag-limpar': () => { AG = agNovo(); agRender(); },
+  'ag-confirmar': () => {
+    try {
+      const c = agendarConsulta({ pacienteId: AG.pacienteId, medicoId: AG.medicoId, data: AG.medicoId ? AG.data : '', horario: AG.horario }, { simularConcorrencia: AG.simular });
+      AG = agNovo(); agRender(); abrirConfirmacao(c); toast(`Consulta ${c.codigo} agendada.`);
+    } catch (e) {
+      tratarErro(e, er => {
+        AG.erros = er.campos || [];
+        const titulos = { FA04: 'Informações obrigatórias ausentes (FA04)', RN01: 'Horário indisponível (FA03)', RN02: 'Fora da disponibilidade (RN02)', RN03: 'Paciente não cadastrado (RN03)', RN04: 'Sem permissão (RN04)' };
+        AG.msg = { t: 'err', h: `<b>${titulos[er.codigo] || 'Não foi possível agendar'}</b>${esc(er.message)}` };
+        if (er.codigo === 'RN01' || er.codigo === 'PAC' || er.codigo === 'PAS') { AG.horario = ''; AG.simular = false; }
+        agRender();
+        $('.step.invalid')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    }
+  },
+  // consultas
+  'det-cons': el => abrirDetalhes(el.dataset.id),
+  'remarcar': el => abrirRemarcar(el.dataset.id),
+  'rm-dia': el => { RM.data = el.dataset.d; RM.horario = ''; RM.erro = null; renderRM(); },
+  'rm-hora': el => { RM.horario = el.dataset.h; RM.erro = null; renderRM(); },
+  'rm-ok': () => { try { const c = remarcarConsulta(RM.id, RM.data, RM.horario); fecharModal(); toast(`Consulta ${c.codigo} remarcada para ${fData(c.data)} às ${c.horario}. Paciente notificado.`); render(); } catch (e) { tratarErro(e, er => { RM.erro = er.message; renderRM(); }); } },
+  'cancelar': el => {
+    const c = cons(el.dataset.id);
+    abrirModal(`Cancelar consulta ${c.codigo}`, `<form data-sub="canc" id="fCanc" novalidate><input type="hidden" name="id" value="${c.id}">
+      <p style="margin-top:0">${esc(pac(c.pacienteId).nome)} · ${esc(med(c.medicoId).nome)} · <b>${fDataL(c.data)} às ${c.horario}</b></p>
+      <label class="f">Motivo do cancelamento <span class="req">*</span><select class="in" name="motivoSel"><option value="">Selecione…</option><option>Solicitado pelo paciente</option><option>Indisponibilidade do médico</option><option>Paciente não poderá comparecer</option><option>Outro</option></select></label>
+      <label class="f">Observação<input class="in" name="obs" placeholder="Opcional"></label>
+      <p class="small muted" style="margin:0">O horário será liberado e o paciente receberá a comunicação do cancelamento.</p></form>`,
+      `<button class="btn" data-act="modal-fechar">Voltar</button><button class="btn dan solid" type="submit" form="fCanc">Cancelar consulta</button>`);
+  },
+  'realizada': el => { try { marcarRealizada(el.dataset.id); fecharModal(); toast('Atendimento registrado.'); render(); } catch (e) { tratarErro(e); } },
+  'conf-pres': el => { try { const c = confirmarPresenca(el.dataset.id); toast(`Presença confirmada para ${fData(c.data)} às ${c.horario}.`); render(); } catch (e) { tratarErro(e); } },
+  // pacientes
+  'novo-pac': () => { PAC_CTX = null; abrirFormPaciente(); },
+  'edit-pac': el => { PAC_CTX = null; abrirFormPaciente(pac(el.dataset.id)); },
+  'agendar-pac': el => { AG = agNovo(); AG.pacienteId = +el.dataset.id; location.hash = 'agendar'; },
+  // médicos
+  'novo-med': () => abrirFormMedico(),
+  'edit-med': el => abrirFormMedico(med(el.dataset.id)),
+  'tog-med': el => { try { alternarMedico(el.dataset.id); render(); } catch (e) { tratarErro(e); } },
+  // agendas
+  'nova-disp': () => abrirFormDisp(),
+  'rem-disp': el => { const a = S.agendas.find(x => x.id === +el.dataset.id); perguntar('Remover disponibilidade', `Remover o período de ${fDataL(a.data)}, ${a.horaInicio}–${a.horaFim}?`, 'Remover', () => { try { removerDisponibilidade(a.id); toast('Disponibilidade removida.'); render(); } catch (e) { tratarErro(e); } }, true); },
+  'fag-sem': el => { FAg.ref = +el.dataset.n ? addDias(FAg.ref, +el.dataset.n) : hoje(); render(); },
+  'med-sem': el => { SEM_MED = +el.dataset.n ? addDias(SEM_MED, +el.dataset.n) : hoje(); render(); },
+  // usuários
+  'novo-usr': () => { abrirFormUsuario(); atualizarVinculo(); },
+  'perm-padrao': () => perguntar('Restaurar permissões padrão', 'A matriz de autorizações voltará à configuração original.', 'Restaurar', () => { exigirOu(() => { exigir('usuarios.gerir'); S.permissoes = clone(PERM_PADRAO); auditar('Permissões restauradas', 'padrão'); salvar(); render(); toast('Permissões restauradas.'); }); }),
+  'tog-usr': el => exigirOu(() => { exigir('usuarios.gerir'); const u = S.usuarios.find(x => x.id === +el.dataset.id); u.ativo = !u.ativo; auditar(u.ativo ? 'Usuário reativado' : 'Usuário inativado', u.login); salvar(); render(); }),
+  'senha-usr': el => { const u = S.usuarios.find(x => x.id === +el.dataset.id); abrirModal(`Redefinir senha · ${esc(u.login)}`, `<form data-sub="senha" id="fSenha" novalidate><input type="hidden" name="id" value="${u.id}"><label class="f">Nova senha<input class="in" type="password" name="senha" autocomplete="new-password" placeholder="mín. 8 caracteres"></label><label class="f">Confirmar senha<input class="in" type="password" name="senha2" autocomplete="new-password"></label></form>`, `<button class="btn" data-act="modal-fechar">Cancelar</button><button class="btn pri" type="submit" form="fSenha">Salvar</button>`); },
+  // backup
+  'bkp-novo': () => exigirOu(() => { criarBackup('Manual'); toast('Backup gerado.'); render(); }),
+  'bkp-rest': el => { const b = S.backups.find(x => x.id === +el.dataset.id); perguntar('Restaurar backup', `Os dados voltarão ao estado de <b>${fTs(b.ts)}</b>. Um backup do estado atual será criado antes (pré-restauração).`, 'Restaurar', () => exigirOu(() => { restaurarDados(b.dados, `ponto de ${fTs(b.ts)}`); if (usuarioAtual()) { toast('Dados restaurados com sucesso.'); render(); } }), true); },
+  'bkp-copiar': async () => { try { await navigator.clipboard.writeText($('#bkpOut').value); toast('JSON copiado para a área de transferência.'); } catch (e) { $('#bkpOut').select(); toast('Selecione o texto e copie com Ctrl+C.', 'warn'); } },
+  'bkp-importar': () => { const t = $('#bkpIn').value.trim(); if (!t) { toast('Selecione um arquivo ou cole o conteúdo do backup.', 'warn'); return; } perguntar('Importar backup', 'Os dados atuais serão substituídos pelo conteúdo importado (um backup pré-restauração será criado).', 'Importar', () => exigirOu(() => { restaurarDados(t, 'importação JSON'); if (usuarioAtual()) { toast('Backup importado com sucesso.'); render(); } }), true); },
+};
+function exigirOu(fn) { try { fn(); } catch (e) { tratarErro(e); } }
+
+const CHG = {
+  'ag-esp': el => { AG.especialidadeId = el.value; const m = med(AG.medicoId); if (m && el.value && m.especialidadeId !== +el.value) { AG.medicoId = ''; AG.horario = ''; } agRender(['med', 'hor', 'res']); },
+  'ag-med': el => { AG.medicoId = el.value; AG.horario = ''; AG.msg = null; AG.erros = AG.erros.filter(x => x !== 'medico'); if (el.value) AG.especialidadeId = String(med(el.value).especialidadeId); agRender(['med', 'hor', 'res']); },
+  'ag-data': el => { if (!el.value) return; AG.data = el.value < hoje() ? hoje() : el.value; AG.horario = ''; agRender(['hor', 'res']); },
+  'ag-sim': el => { AG.simular = el.checked; },
+  'rm-data': el => { if (!el.value) return; RM.data = el.value < hoje() ? hoje() : el.value; RM.horario = ''; renderRM(); },
+  'fc': el => { FC[el.name] = el.value; renderTabCons(); },
+  'fag-med': el => { FAg.medicoId = el.value; render(); },
+  'perm': el => exigirOu(() => {
+    exigir('usuarios.gerir', 'definir autorizações');
+    const l = S.permissoes[el.dataset.perfil], k = el.dataset.k;
+    if (el.checked && !l.includes(k)) l.push(k); if (!el.checked) S.permissoes[el.dataset.perfil] = l.filter(x => x !== k);
+    auditar('Permissão alterada', `${PERFIS[el.dataset.perfil]}: ${k} → ${el.checked ? 'concedida' : 'revogada'}`); salvar();
+    toast(`${PERFIS[el.dataset.perfil]}: “${PERMS.find(p => p[0] === k)[1]}” ${el.checked ? 'concedida' : 'revogada'}.`);
+  }),
+  'usr-perfil': () => atualizarVinculo(),
+  'bkp-arq': el => { const f = el.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => { $('#bkpIn').value = r.result; toast('Arquivo carregado. Clique em “Validar e restaurar”.'); }; r.readAsText(f); },
+};
+function atualizarVinculo() {
+  const f = $('#fUsr'); if (!f) return; const p = f.perfil.value; const box = $('#usrVinc');
+  if (p === 'medico') { box.style.display = ''; f.vinculo.innerHTML = S.medicos.filter(m => !S.usuarios.some(u => u.medicoId === m.id)).map(m => `<option value="${m.id}">${esc(m.nome)}</option>`).join('') || '<option value="">Todos os médicos já possuem acesso</option>'; }
+  else if (p === 'paciente') { box.style.display = ''; f.vinculo.innerHTML = S.pacientes.filter(x => !S.usuarios.some(u => u.pacienteId === x.id)).map(x => `<option value="${x.id}">${esc(x.nome)} · ${x.cpf}</option>`).join(''); }
+  else box.style.display = 'none';
+}
+const INP = {
+  'ag-busca': el => { AG.busca = el.value; $('#agPacRes').innerHTML = agPacRes(); },
+  'fc': el => { FC.q = el.value; renderTabCons(); },
+  'fp': el => { FP = el.value; renderTabPac(); },
+};
+const SUB = {
+  login: async f => {
+    const box = $('#loginMsg'); const btn = f.querySelector('button[type=submit]'); btn.disabled = true;
+    try { await login(f.login.value, f.senha.value); location.hash = ''; render(); }
+    catch (e) { box.innerHTML = `<div class="msg err" role="alert">${esc(e.message)}</div>`; f.senha.value = ''; f.senha.focus(); }
+    finally { btn.disabled = false; }
+  },
+  pac: f => {
+    const d = Object.fromEntries(new FormData(f));
+    try {
+      const p = salvarPaciente(d); fecharModal(); toast(d.id ? 'Dados do paciente atualizados.' : `Paciente ${p.nome} cadastrado.`);
+      if (PAC_CTX === 'agendar') { AG.pacienteId = p.id; AG.erros = AG.erros.filter(x => x !== 'paciente'); AG.msg = { t: 'ok', h: '<b>Paciente cadastrado</b>Continue o agendamento selecionando médico, data e horário.' }; PAC_CTX = null; agRender(['pac', 'res']); }
+      else render();
+    } catch (e) { tratarErro(e, er => er.porCampo ? mostrarErrosCampos(f, er.porCampo) : toast(er.message, 'err')); }
+  },
+  esp: f => { try { const e = salvarEspecialidade(f.nome.value); toast(`Especialidade ${e.nome} cadastrada.`); render(); } catch (e) { tratarErro(e, er => mostrarErrosCampos(f, { nome: er.message })); } },
+  med: async f => {
+    const d = Object.fromEntries(new FormData(f)); d.criarUsuario = !!f.criarUsuario?.checked;
+    try { const m = await salvarMedico(d); fecharModal(); toast(d.id ? 'Cadastro do médico atualizado.' : `${m.nome} cadastrado(a) em ${esp(m.especialidadeId).nome}.`); render(); }
+    catch (e) { tratarErro(e, er => er.porCampo ? mostrarErrosCampos(f, er.porCampo) : toast(er.message, 'err')); }
+  },
+  disp: f => {
+    const d = { medicoId: f.medicoId.value, de: f.de.value, ate: f.ate.value, ini: f.ini.value, fim: f.fim.value, dias: $$('input[name=dias]:checked', f).map(x => +x.value) };
+    try {
+      const r = adicionarDisponibilidade(d); fecharModal(); FAg.medicoId = +d.medicoId;
+      toast(`${r.criadas} dia(s) de atendimento cadastrados.${r.sobrepostas.length ? ` ${r.sobrepostas.length} dia(s) ignorado(s) por sobreposição.` : ''}`, r.criadas ? '' : 'warn'); render();
+    } catch (e) { tratarErro(e, er => mostrarErrosCampos(f, er.porCampo ? Object.fromEntries(Object.entries(er.porCampo).map(([k, v]) => [k === 'dias' ? 'dias_h' : k, v])) : {})); }
+  },
+  canc: f => {
+    const motivo = [f.motivoSel.value, f.obs.value.trim()].filter(Boolean).join(' — ');
+    if (!f.motivoSel.value) { mostrarErrosCampos(f, { motivoSel: 'Selecione o motivo do cancelamento.' }); return; }
+    try { const c = cancelarConsulta(f.id.value, motivo); fecharModal(); toast(`Consulta ${c.codigo} cancelada. Horário liberado e paciente notificado.`); render(); }
+    catch (e) { tratarErro(e); }
+  },
+  usr: async f => {
+    const d = Object.fromEntries(new FormData(f)); const er = {};
+    try { exigir('usuarios.gerir', 'criar usuários'); } catch (e) { tratarErro(e); return; }
+    if (d.nome.trim().length < 3) er.nome = 'Informe o nome.';
+    if (!/^[a-z0-9._-]{3,}$/.test(d.login)) er.login = 'Use 3+ caracteres: letras minúsculas, números, ponto, hífen.'; else if (S.usuarios.some(u => u.login === d.login)) er.login = 'Login já em uso.';
+    if ((d.senha || '').length < 8) er.senha = 'A senha deve ter ao menos 8 caracteres.';
+    if ((d.perfil === 'medico' || d.perfil === 'paciente') && !d.vinculo) er.vinculo = 'Selecione o vínculo.';
+    if (Object.keys(er).length) { mostrarErrosCampos(f, er); return; }
+    await criarUsuarioBruto({ login: d.login, nome: d.nome.trim(), perfil: d.perfil, senha: d.senha, medicoId: d.perfil === 'medico' ? +d.vinculo : null, pacienteId: d.perfil === 'paciente' ? +d.vinculo : null });
+    auditar('Usuário criado', `${d.login} (${PERFIS[d.perfil]})`); salvar(); fecharModal(); toast(`Usuário ${d.login} criado.`); render();
+  },
+  senha: async f => {
+    try { exigir('usuarios.gerir', 'redefinir senhas'); } catch (e) { tratarErro(e); return; }
+    if (f.senha.value.length < 8) { mostrarErrosCampos(f, { senha: 'A senha deve ter ao menos 8 caracteres.' }); return; }
+    if (f.senha.value !== f.senha2.value) { mostrarErrosCampos(f, { senha2: 'As senhas não conferem.' }); return; }
+    const u = S.usuarios.find(x => x.id === +f.id.value); u.salt = novoSalt(); u.senhaHash = await hashSenha(f.senha.value, u.salt);
+    auditar('Senha redefinida', u.login); salvar(); fecharModal(); toast(`Senha de ${u.login} redefinida.`);
+  },
+};
+
+document.addEventListener('click', e => { const a = e.target.closest('[data-act]');
+  if (a && a.dataset.act === 'modal-fundo' && e.target !== a) return; // clique dentro do modal: não interferir (ex.: submit)
+  if (a && ACT[a.dataset.act]) { if (a.tagName !== 'A') e.preventDefault(); ACT[a.dataset.act](a, e); } });
+document.addEventListener('change', e => { const a = e.target.closest('[data-chg]'); if (a && CHG[a.dataset.chg]) CHG[a.dataset.chg](a, e); });
+document.addEventListener('input', e => {
+  const t = e.target;
+  if (t.dataset.mask) { t.value = mascara(t.dataset.mask, t.value); }
+  if (t.closest('.invalid')) { const l = t.closest('.invalid'); l.classList.remove('invalid'); l.querySelector('.ferr')?.remove(); }
+  const a = t.closest('[data-inp]'); if (a && INP[a.dataset.inp]) INP[a.dataset.inp](a, e);
+});
+document.addEventListener('submit', e => { e.preventDefault(); const f = e.target; SUB[f.dataset.sub] && SUB[f.dataset.sub](f); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#modalRoot').innerHTML) fecharModal(); });
+window.addEventListener('hashchange', () => { if (usuarioAtual()) { fecharModal(); render(); } });
+// sessão: renova a cada interação e expira por inatividade (RNF02)
+['click', 'keydown'].forEach(ev => document.addEventListener(ev, () => { if (SESSAO) { SESSAO.ultimo = Date.now(); salvarSessao(); } }, true));
+setInterval(() => { if (SESSAO && Date.now() - SESSAO.ultimo > SESSAO_MIN * 60000) { fecharModal(); logout(`Sessão encerrada após ${SESSAO_MIN} minutos de inatividade. Entre novamente.`); } }, 20000);
+
+(async function iniciar() {
+  const d = carregar();
+  if (d && validarEstrutura(d)) S = d; else await seed();
+  const s = carregarSessao();
+  if (s && S.usuarios.some(u => u.id === s.userId && u.ativo) && Date.now() - s.ultimo < SESSAO_MIN * 60000) SESSAO = s;
+  render();
+})();
+</script>
+</body>
+</html>
