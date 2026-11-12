@@ -4,13 +4,13 @@ Protótipo navegável do **Sistema de Gestão de Clínica (SGC)**, desenvolvido 
 
 **Alunos:** Brenda Mendes Araujo (202209150008) e Matheus Guimarães Liporace (202302417949)
 
-![Tela Agendar consulta](docs/img/agendar-consulta.png)
+![Tela Agendar consulta](agendar-consulta.png)
 
 ## Como abrir
 
 O protótipo é um único arquivo, `index.html`, sem instalação nem servidor.
 
-- **Online (GitHub Pages):** `https://<usuario>.github.io/sgc-prototipo/`
+- **Online (GitHub Pages):** `https://liporacem.github.io/<nome-do-repositorio>/` (após ativar em *Settings → Pages*)
 - **Local:** baixe o repositório e abra `index.html` em um navegador atual (Chrome, Edge, Firefox ou Safari).
 
 Os dados são fictícios e ficam guardados apenas no navegador de quem abre a página. Para voltar ao estado inicial, use **Rastreabilidade → Restaurar dados de demonstração**.
@@ -60,7 +60,7 @@ A tabela completa, com o caminho de teste de cada item, está na aba **Rastreabi
 
 ## Documentação do projeto
 
-O documento completo, [`docs/AC_SGC_Projeto_Completo.pdf`](docs/AC_SGC_Projeto_Completo.pdf), traz as sete seções da AC:
+O documento completo, [`AC_SGC_Projeto_Completo.pdf`](AC_SGC_Projeto_Completo.pdf), traz as sete seções da AC:
 
 1. Fundamentação e processo (RUP)
 2. Concepção e requisitos
@@ -72,16 +72,16 @@ O documento completo, [`docs/AC_SGC_Projeto_Completo.pdf`](docs/AC_SGC_Projeto_C
 
 | Agenda do médico | Confirmação do agendamento |
 |---|---|
-| ![Agenda do médico](docs/img/agenda-medico.png) | ![Confirmação](docs/img/confirmacao.png) |
+| ![Agenda do médico](agenda-medico.png) | ![Confirmação](confirmacao.png) |
 
-![Modelo de dados](docs/img/modelo-dados.png)
+![Modelo de dados](modelo-dados.png)
 
 ## Estrutura do repositório
 
 ```
-index.html                         protótipo completo (interface, regras e dados de demonstração)
-docs/AC_SGC_Projeto_Completo.pdf   documento da AC
-docs/img/                          capturas de tela e modelo de dados
+index.html                    protótipo completo (interface, regras e dados de demonstração)
+AC_SGC_Projeto_Completo.pdf   documento da AC
+*.png                         capturas de tela e modelo de dados
 ```
 
 ## Observações
